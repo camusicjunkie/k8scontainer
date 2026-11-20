@@ -1,0 +1,16 @@
+# Headless Service the StatefulSet requires (serviceName). Gateway exposure
+# comes with the Roster work, not here.
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin
+  namespace: devcontainer
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: devcontainer
+    devcontainer/admin: admin
+  ports:
+    - name: ssh
+      port: 2222
+      targetPort: ssh

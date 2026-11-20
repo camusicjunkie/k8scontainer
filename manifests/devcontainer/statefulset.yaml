@@ -1,0 +1,77 @@
+# One admin's Devcontainer Pod (hard-coded single admin; the Roster generates
+# these later). The image is the Standard Image: non-root user dev (1000),
+# sshd on 2222. The State Directory is one volume mounted only at the six
+# paths below; the rest of the home directory comes from the image.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: admin
+  namespace: devcontainer
+spec:
+  replicas: 1
+  serviceName: admin
+  updateStrategy:
+    type: OnDelete
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: devcontainer
+      devcontainer/admin: admin
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: devcontainer
+        devcontainer/admin: admin
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: devcontainer
+          image: harbor.example/devcontainer/standard:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: ssh
+              containerPort: 2222
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          readinessProbe:
+            tcpSocket:
+              port: ssh
+          volumeMounts:
+            - { name: state, mountPath: /home/dev/workspace, subPath: workspace }
+            - { name: state, mountPath: /home/dev/.kube, subPath: .kube }
+            - { name: state, mountPath: /home/dev/.secrets, subPath: .secrets }
+            - { name: state, mountPath: /home/dev/.devc/personal, subPath: .devc/personal }
+            - { name: state, mountPath: /var/lib/devc/hostkeys, subPath: hostkeys }
+            - { name: state, mountPath: /home/dev/.local, subPath: .local }
+            # Single-file (subPath) mounts: the image's CA refresh rejects
+            # symlinks, which a whole ConfigMap directory is made of.
+            - { name: site-config, mountPath: /etc/devcontainer/site/site.env, subPath: site.env, readOnly: true }
+            - { name: site-config, mountPath: /etc/devcontainer/site/ca/site-ca.crt, subPath: site-ca.crt, readOnly: true }
+      volumes:
+        - name: site-config
+          configMap:
+            name: site-config
+  volumeClaimTemplates:
+    - metadata:
+        name: state
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 20Gi
