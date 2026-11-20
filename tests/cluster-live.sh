@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# Live cluster seam: what tests/cluster.sh can only render, run on the kind
+# cluster from tests/kind/up.sh (with GIT_URL set) under the Gitops
+# repository's Kyverno policies.
+#
+#   tests/cluster-live.sh
+#
+# Checks, in order: the admin's Pod runs under Pod Security restricted and
+# answers SSH with the Roster's key; a restart keeps the State Directory and
+# host key and nothing else; a new Release tag reaches the StatefulSet through
+# the image automation but the Pod only on restart (OnDelete); removing the
+# admin from the Roster removes the Pod and keeps the volume, and adding them
+# back finds their state.
+#
+# Pushes a new tag to REGISTRY (through DOCKER_NETWORK) and lets the
+# automation commit to the synced branch. Needs kubectl, ssh and docker.
+set -uo pipefail
+ctx=${KUBE_CONTEXT:-kind-devc}
+state=${STATE_DIR:-$HOME/.cache/devc-kind}
+registry=${REGISTRY:-registry.local:5000}
+network=${DOCKER_NETWORK:-gitlab-local_default}
+repo_path=${HARBOR_PROJECT:-harbor}/devcontainer/standard
+ns=devcontainer
+failed=0
+export MSYS_NO_PATHCONV=1
+ok() { echo "ok   $1"; }
+bad() { echo "FAIL $1"; failed=1; }
+check() { if eval "$2"; then ok "$1"; else bad "$1"; fi; }
+k() { kubectl --context "$ctx" "$@"; }
+crane() { docker run --rm --network "$network" gcr.io/go-containerregistry/crane:v0.22.1 "$@" --insecure; }
+
+reconcile() {  # ask Flux to act now rather than at its next interval
+    local at; at=$(date +%s)
+    k -n flux-system annotate gitrepository/k8scontainer kustomization/devcontainer \
+        reconcile.fluxcd.io/requestedAt="$at" --overwrite >/dev/null
+    k -n $ns annotate imagerepository/devcontainer-standard imageupdateautomation/devcontainer \
+        resourcesetinputprovider/roster resourceset/devcontainer reconcile.fluxcd.io/requestedAt="$at" --overwrite >/dev/null 2>&1
+}
+until_true() {  # until_true SECONDS COMMAND: retries, reconciling Flux each time
+    local end=$((SECONDS + $1)); shift
+    until eval "$*"; do ((SECONDS < end)) || return 1; reconcile; sleep 5; done
+}
+pod_image() { k -n $ns get pod devc-admin-0 -o jsonpath='{.spec.containers[0].image}' 2>/dev/null; }
+sts_image() { k -n $ns get sts devc-admin -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null; }
+pod_ready() { k -n $ns wait pod/devc-admin-0 --for=condition=Ready --timeout "${1:-600}s" >/dev/null 2>&1; }
+restart() { k -n $ns delete pod devc-admin-0 --wait=true >/dev/null; sleep 2; pod_ready; }
+
+# ssh to the admin's Pod as the Workstation would, through a port-forward to
+# the Service the TCPRoute targets (no Istio here to program the Gateway).
+pod_ssh() {
+    local port=$((20000 + RANDOM % 10000)) pf out rc
+    k -n $ns port-forward svc/devc-admin-ssh "$port:2222" >/dev/null 2>&1 & pf=$!
+    for _ in $(seq 20); do (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null && break; sleep 0.5; done
+    out=$(ssh -i "$state/id_rsa" -p "$port" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=no \
+        -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR dev@127.0.0.1 "$@"); rc=$?
+    kill $pf 2>/dev/null; wait $pf 2>/dev/null
+    printf '%s' "$out"; return $rc
+}
+hostkey() { pod_ssh 'ssh-keygen -lf /var/lib/devc/hostkeys/ssh_host_ed25519_key.pub | cut -d" " -f2'; }
+
+echo "== the admin's Pod"
+check "the ResourceSet is Ready" "k -n $ns wait resourceset/devcontainer --for=condition=Ready --timeout 300s >/dev/null"
+check "the Pod is Ready" "pod_ready"
+check "the namespace enforces Pod Security restricted" \
+    "[[ \$(k get ns $ns -o jsonpath='{.metadata.labels.pod-security\.kubernetes\.io/enforce}') == restricted ]]"
+check "the Pod runs the image from $registry" "[[ \$(pod_image) == $registry/* ]]"
+check "the Roster's key opens a shell" "[[ \$(pod_ssh 'echo hello') == hello ]]"
+
+echo "== restart"
+pod_ssh 'echo kept >~/workspace/note; echo off >~/stray' >/dev/null
+before=$(hostkey)
+check "the Pod comes back after a restart" "restart"
+check "the State Directory survives a restart" "[[ \$(pod_ssh 'cat ~/workspace/note') == kept ]]"
+check "the rest of the home directory does not" "pod_ssh 'test ! -e ~/stray'"
+after=$(hostkey)
+check "the host key is the same after a restart ($before)" "[[ -n '$before' && '$before' == '$after' ]]"
+
+echo "== a new Release"
+old=$(pod_image); old_tag=${old##*:}
+new_tag=0.1.$(date +%s)
+crane copy "$registry/$repo_path:$old_tag" "$registry/$repo_path:$new_tag" >/dev/null 2>&1
+check "the automation commits $new_tag and the StatefulSet template follows" \
+    "until_true 300 '[[ \$(sts_image) == *:$new_tag ]]'"
+check "the running Pod keeps $old_tag until its admin restarts it (OnDelete)" "[[ \$(pod_image) == '$old' ]]"
+check "after a restart the Pod runs $new_tag" "restart && [[ \$(pod_image) == *:$new_tag ]]"
+check "and its State Directory is still there" "[[ \$(pod_ssh 'cat ~/workspace/note') == kept ]]"
+
+echo "== leaving and rejoining the Roster"
+patches=$(k -n flux-system get kustomization devcontainer -o jsonpath='{.spec.patches}')
+k -n flux-system patch kustomization devcontainer --type json \
+    -p '[{"op":"add","path":"/spec/patches/-","value":{"target":{"kind":"ResourceSetInputProvider","name":"roster"},"patch":"- {op: remove, path: /spec/defaultValues/admins/0}"}}]' >/dev/null
+check "removing the entry removes the StatefulSet and Pod" \
+    "until_true 180 '! k -n $ns get sts devc-admin >/dev/null 2>&1 && ! k -n $ns get pod devc-admin-0 >/dev/null 2>&1'"
+check "and keeps the volume" "k -n $ns get pvc state-devc-admin-0 >/dev/null 2>&1"
+k -n flux-system patch kustomization devcontainer --type merge -p "{\"spec\":{\"patches\":$patches}}" >/dev/null
+check "adding the entry back brings the Pod back" "until_true 180 'k -n $ns get pod devc-admin-0 >/dev/null 2>&1' && pod_ready"
+check "on the same volume" "[[ \$(pod_ssh 'cat ~/workspace/note') == kept ]]"
+
+exit $failed

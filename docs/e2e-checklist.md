@@ -1,12 +1,12 @@
 # End-to-end checklist: the Disconnected Side
 
-The manual gate for a Release. Run it on the Disconnected Side before a Release is declared good, and again whenever the VS Code commit, the Roster/ResourceSet manifests or the image automation change. `devc-selftest`, `tests/image.sh`, `tests/cluster.sh`, `tests/release.sh`, `tests/secrets-klogin.sh` and the installer's Pester tests cover the parts that need no real cluster, card or Gateway. This checklist covers what they could not: the Workstation, the Gateway, the smartcard, the Management Cluster and the Devcontainer Pod together, with no Internet. Each item names what it settles; items marked **[unverified]** are the ones the tickets recorded as never having run against the real thing.
+The manual gate for a Release. Run it on the Disconnected Side before a Release is declared good, and again whenever the VS Code commit, the Roster/ResourceSet manifests or the image automation change. `devc-selftest`, `tests/image.sh`, `tests/cluster.sh`, `tests/release.sh`, `tests/secrets-klogin.sh` and the installer's Pester tests cover the parts that need no real cluster, card or Gateway; `tests/cluster-live.sh` runs sections 2, 7, 8 and 9's cluster side on a kind cluster, but not under Istio, real Harbor or the real Management Cluster. This checklist covers what they could not: the Workstation, the Gateway, the smartcard, the Management Cluster and the Devcontainer Pod together, with no Internet. Each item names what it settles; items marked **[unverified]** are the ones the tickets recorded as never having run against the real thing.
 
 Record the date, the Release version, who ran it, the result of every step and anything odd. A failure blocks the Release until it is fixed.
 
 ## Setup
 
-- **Management Cluster** on the Disconnected Side with Flux (including the image controllers and the ImageUpdateAutomation in the Gitops repository), Kyverno, Istio ambient and Gateway API CRDs.
+- **Management Cluster** on the Disconnected Side with Flux (including the image controllers and an ImageUpdateAutomation for this repository in the `devcontainer` namespace; see the Release Owner guide), Kyverno, Istio ambient and Gateway API CRDs.
 - **Two test admins** on the Roster, with real smartcards, different ports. Call them A and B.
 - **A Workstation** with the Windows OpenSSH agent holding the card's keys, and the Release's Workstation pack.
 - **Two Releases** already imported (the one under test and the one before it), for sections 7 and 9. Have kubectl access to the Management Cluster for the checks that say so.
@@ -24,7 +24,7 @@ Record the date, the Release version, who ran it, the result of every step and a
 
 - [ ] **[unverified]** The Flux Operator reports the ResourceSet `devcontainer` Ready, and the inventory holds, per admin, a StatefulSet, a key list, two Services and a TCPRoute, plus one Gateway.
 - [ ] **[unverified]** The Devcontainer Namespace enforces Pod Security `restricted` (label `pod-security.kubernetes.io/enforce=restricted`) and the Pods start under it: `kubectl -n devcontainer get pods` shows `devc-<name>-0` Running with no admission warnings.
-- [ ] **[unverified]** The existing Kyverno policies admit the Pods and the other generated objects (no policy violation reports for the namespace).
+- [ ] **[unverified]** The existing Kyverno policies admit the Pods and the other generated objects (no policy violation reports for the namespace). On kind, the image rewrite policy as committed rejected the StatefulSet (`request.object.metadata.namespace` under Kyverno's autogen); check the cluster runs a fixed one.
 - [ ] **[unverified]** The Istio ambient label is on the namespace and the Pods are enrolled in the mesh (check with the mesh's own tooling).
 - [ ] **[unverified]** The `standard` StorageClass binds each admin's claim `state-devc-<name>-0`.
 - [ ] **[unverified]** The cluster's Gateway API CRDs serve `TCPRoute` at `v1alpha2` (the version the ResourceSet renders). If not, record which version it serves.

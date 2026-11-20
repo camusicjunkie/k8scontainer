@@ -44,6 +44,11 @@ else
     else
         skip tests/cluster.sh "Docker, kubectl and the flux-operator CLI"
     fi
+    if has kubectl && kubectl --context "${KUBE_CONTEXT:-kind-devc}" -n flux-system get kustomization devcontainer >/dev/null 2>&1; then
+        run tests/cluster-live.sh bash tests/cluster-live.sh
+    else
+        skip tests/cluster-live.sh "the kind cluster from tests/kind/up.sh with GIT_URL set"
+    fi
     if has pwsh && pwsh -NoProfile -c 'exit [int]!(Get-Module -ListAvailable Pester | ? { $_.Version.Major -ge 5 })' 2>/dev/null; then
         run workstation/tests pwsh -NoProfile -c 'exit (Invoke-Pester workstation/tests -PassThru).FailedCount'
     else

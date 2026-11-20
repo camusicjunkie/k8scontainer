@@ -1,0 +1,66 @@
+# What tests/kind/up.sh applies when GIT_URL is set: Flux syncs
+# manifests/devcontainer from a branch the test may push to, with the
+# registry and the test's key patched in, and the image automation commits
+# Roster updates back to that branch. envsubst fills ${...}.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: k8scontainer
+  namespace: flux-system
+spec:
+  interval: 1m
+  url: ${GIT_URL}
+  ref:
+    branch: ${GIT_BRANCH}
+  secretRef:
+    name: devc-git
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: devcontainer
+  namespace: flux-system
+spec:
+  interval: 1m
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: k8scontainer
+  path: ./manifests/devcontainer
+  patches:
+    # This registry in place of harbor.example, scanned over plain HTTP.
+    - target: { kind: ImageRepository, name: devcontainer-standard }
+      patch: |
+        - { op: replace, path: /spec/image, value: ${REGISTRY}/${HARBOR_PROJECT}/devcontainer/standard }
+        - { op: add, path: /spec/insecure, value: true }
+    # The test's own key in place of the placeholder.
+    - target: { kind: ResourceSetInputProvider, name: roster }
+      patch: |
+        - { op: replace, path: /spec/defaultValues/admins/0/publicKey, value: "${TEST_PUBKEY}" }
+---
+# In the devcontainer namespace: an ImageUpdateAutomation applies only the
+# ImagePolicies in its own namespace, and the Roster's marker names
+# devcontainer:devcontainer-standard.
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageUpdateAutomation
+metadata:
+  name: devcontainer
+  namespace: devcontainer
+spec:
+  interval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: k8scontainer
+    namespace: flux-system
+  git:
+    checkout:
+      ref:
+        branch: ${GIT_BRANCH}
+    commit:
+      author: { email: fluxcdbot@users.noreply.github.com, name: fluxcdbot }
+      messageTemplate: "chore(images): update automated image tags [skip ci]"
+    push:
+      branch: ${GIT_BRANCH}
+  update:
+    path: ./manifests/devcontainer
+    strategy: Setters
