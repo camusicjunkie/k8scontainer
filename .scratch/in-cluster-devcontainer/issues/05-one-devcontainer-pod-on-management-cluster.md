@@ -4,10 +4,18 @@
 
 **Blocked by:** 03, 04
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] The Devcontainer Namespace enforces Pod Security `restricted` and the Pod runs under it
 - [ ] The Pod is a one-replica StatefulSet with the `OnDelete` update strategy, pulling the image from the Registry
 - [ ] The volume is mounted only at the specific paths the spec lists, and content written there survives a Pod restart
 - [ ] Site Config is a read-only ConfigMap and its certificate authorities are trusted in the Pod
 - [ ] The manifests pass the cluster seam's schema and policy checks, including the existing Kyverno policies
+
+## Answer
+
+Manifests for one hard-coded admin live in `manifests/devcontainer/` (Namespace, Site Config ConfigMap, headless Service, one-replica `OnDelete` StatefulSet with a 20Gi `standard` claim). The cluster seam is `tests/cluster.sh` (+ `tests/cluster_policy.py`): kustomize render, kubeconform against the Kubernetes 1.31 schemas, a Pod Security `restricted` and layout assertion, then the Standard Image started with the Pod security context to check persistence at the six volume paths and Site Config CA trust. All pass.
+
+Not verified without the real Management Cluster: the existing Kyverno policies (the Gitops repo is not available; the static restricted check stands in), the Istio ambient label, StorageClass `standard`, real Pod startup under restricted PSS, the Registry host/tag (placeholder `harbor.example/devcontainer/standard:0.1.0`).
+
+Image finding: `devc-ca-refresh` rejects symlinks, and a ConfigMap directory mount is all symlinks, so Site Config CAs are mounted as single `subPath` files (regular files). They do not update live; a restart picks up changes, which fits `OnDelete`. If live updates or a directory mount are wanted, the image should follow symlinks that resolve inside the mount.

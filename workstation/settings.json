@@ -1,0 +1,21 @@
+{
+  "remote.SSH.path": "C:\\Windows\\System32\\OpenSSH\\ssh.exe",
+  "remote.SSH.enableAgentForwarding": true,
+  "remote.SSH.localServerDownload": "off",
+  "remote.SSH.remotePlatform": {},
+  "remote.SSH.defaultExtensions": [],
+  "remote.SSH.experimental.chat": false,
+  "update.mode": "none",
+  "update.showReleaseNotes": false,
+  "extensions.autoUpdate": false,
+  "extensions.autoCheckUpdates": false,
+  "extensions.ignoreRecommendations": true,
+  "telemetry.telemetryLevel": "off",
+  "workbench.enableExperiments": false,
+  "workbench.settings.enableNaturalLanguageSearch": false,
+  "json.schemaDownload.enable": false,
+  "npm.fetchOnlinePackageInfo": false,
+  "chat.disableAIFeatures": true,
+  "chat.remoteAgentHostsEnabled": false,
+  "chat.remoteAgentHostsAutoConnect": false
+}
