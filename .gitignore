@@ -22,3 +22,4 @@ kubeconfig
 # Logs and temp files
 *.log
 *.tmp
+.claude/worktrees/
