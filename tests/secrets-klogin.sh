@@ -10,15 +10,10 @@
 set -uo pipefail
 
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# shellcheck source=lib.sh
+source "$repo/tests/lib.sh"
 image=${IMAGE:-}
-failed=()
 
-pass() { printf 'ok   %s\n' "$1"; }
-fail() { printf 'FAIL %s\n' "$1"; failed+=("$1"); }
-check() { # check DESCRIPTION CONDITION-COMMAND...
-    local d=$1; shift
-    if "$@"; then pass "$d"; else fail "$d"; fi
-}
 
 if [[ -z $image ]]; then
     image=devc-standard:secrets-test
@@ -146,6 +141,11 @@ drive no <<<"printf 'DEVC_UNLOCK_KEY=%s\n' '$fp' >~/.devc/personal/personal.env"
 # ------------------------------------------------------------ Site Config in shells
 out=$(drive no <<<'echo "ns=$KLOGIN_NAMESPACES srv=$KLOGIN_SERVERS"')
 check "Site Config's site.env reaches a login shell's environment" [ "$out" = "ns=team-a,team-b srv=sup.example.invalid" ]
+
+# Personal Config's bashrc, on its volume at ~/.devc/personal, runs in interactive shells.
+drive no <<<"echo 'export DEVC_PERSONAL_PROBE=loaded' >~/.devc/personal/bashrc" >/dev/null
+out=$(drive no <<<"bash -ic 'echo \$DEVC_PERSONAL_PROBE'")
+check "Personal Config's bashrc is loaded from ~/.devc/personal" grep -qx loaded <<<"$out"
 
 # ------------------------------------------------------- creating the Secrets File
 out=$(drive yes ed <<<"secrets init; echo rc=\$?; test -e ~/.secrets/vault && echo exists")

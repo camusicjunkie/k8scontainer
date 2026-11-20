@@ -10,17 +10,12 @@
 set -uo pipefail
 
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# shellcheck source=lib.sh
+source "$repo/tests/lib.sh"
 skopeo_image=quay.io/skopeo/stable:v1.25.1
 net=devc-rel-test-$$
 work=$(mktemp -d)
-failed=()
 
-pass() { printf 'ok   %s\n' "$1"; }
-fail() { printf 'FAIL %s\n' "$1"; failed+=("$1"); }
-check() { # check DESCRIPTION COMMAND...
-    local d=$1; shift
-    if "$@"; then pass "$d"; else fail "$d"; fi
-}
 
 # Docker on Windows wants native paths for bind mounts.
 native() { if command -v cygpath >/dev/null; then cygpath -w "$1"; else echo "$1"; fi; }

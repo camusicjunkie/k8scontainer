@@ -91,6 +91,6 @@ tool ping ping -V
 tool netcat nc -h
 check "bash-completion is installed" test -r /usr/share/bash-completion/bash_completion
 
-# ADR 0001: brew's tree never reaches the image.
+# brew's tree never reaches the image.
 check "brew is not in the image" bash -c '! command -v brew && ! command -v ruby && [[ ! -e /home/linuxbrew ]]'
 check "interactive shells complete kubectl" bash -ic 'complete -p kubectl'

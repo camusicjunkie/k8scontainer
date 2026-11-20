@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # brew-export.sh LIST OUT: runs in the brew builder stage. Installs every formula
-# in LIST (latest at build time, ADR 0001) and exports their binaries, bash
+# in LIST (latest at build time) and exports their binaries, bash
 # completions and `brew list --versions` to OUT for brew-check.sh. Nothing else
 # of brew leaves this stage.
 set -euo pipefail

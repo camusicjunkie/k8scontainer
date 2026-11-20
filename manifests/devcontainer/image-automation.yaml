@@ -32,6 +32,7 @@ spec:
     name: devcontainer-standard
   policy:
     semver:
-      # Release tags are plain MAJOR.MINOR.PATCH. A range without a
+      # Release tags are MAJOR.MINOR.PATCH with an optional leading v (the CI rule
+      # accepts both; semver ranges ignore the v). A range without a
       # pre-release part never selects a pre-release tag.
       range: ">=0.1.0"

@@ -1,7 +1,7 @@
 # shellcheck shell=bash
-# Personal Config's bashrc, mounted read-only from ~/.devc/personal. Last, so it
+# Personal Config's bashrc, on the admin's volume at ~/.devc/personal. Last, so it
 # can override anything the image sets.
-if [[ -r /etc/devcontainer/personal/bashrc ]]; then
+if [[ -r "$HOME/.devc/personal/bashrc" ]]; then
     # shellcheck source=/dev/null
-    source /etc/devcontainer/personal/bashrc
+    source "$HOME/.devc/personal/bashrc"
 fi

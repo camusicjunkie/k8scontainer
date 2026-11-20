@@ -13,7 +13,7 @@ ARG HADOLINT_IMAGE=hadolint/hadolint:v2.15.1-debian@sha256:9a3944b7fddcb947d1ffd
 FROM ${HADOLINT_IMAGE} AS hadolint
 
 # ------------------------------------------------------------------ brew
-# ADR 0001: brew installs the CLIs from the flat list, latest at build time, and
+# brew installs the CLIs from the flat list, latest at build time, and
 # only their binaries, completions and versions leave this stage.
 FROM ${BREW_IMAGE} AS brew
 RUN --mount=type=bind,source=packages/brew.txt,target=/tmp/brew.txt \

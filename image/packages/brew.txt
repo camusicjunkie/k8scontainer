@@ -1,4 +1,4 @@
-# brew formulae for the builder stage (ADR 0001), one per line; tap/formula for
+# brew formulae for the builder stage, one per line; tap/formula for
 # tapped ones. Latest at build time; `brew list --versions` goes in MANIFEST.
 # Only binaries that are static or need nothing but glibc can come from here
 # (image/build/brew-check.sh); anything else fails the build.

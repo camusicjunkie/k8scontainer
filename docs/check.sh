@@ -59,6 +59,10 @@ grep -q 'imagepolicy": "devcontainer:devcontainer-standard' manifests/devcontain
 grep -q 'ms-vscode-remote.remote-ssh' workstation/install.ps1 || bad "Remote-SSH id differs"
 grep -q 'state-devc\|name: state' manifests/devcontainer/resourceset.yaml || bad "volume claim name differs"
 grep -q 'DEVC_UNLOCK_KEY' image/rootfs/usr/local/lib/devc/secrets.bash || bad "DEVC_UNLOCK_KEY missing"
+# Personal Config: the bashrc the image sources is on the path the Pod mounts.
+grep -q 'mountPath: /home/dev/.devc/personal' manifests/devcontainer/resourceset.yaml || bad "Pod does not mount Personal Config at ~/.devc/personal"
+grep -q '\$HOME/.devc/personal/bashrc' image/rootfs/etc/bash.bashrc.d/99-personal.sh || bad "99-personal.sh does not read ~/.devc/personal/bashrc"
+! grep -rq '/etc/devcontainer/personal' image manifests || bad "stale /etc/devcontainer/personal path"
 
 [[ -e $flag ]] && { fail=1; rm -f "$flag"; }
 ((fail)) && { echo "docs check FAILED"; exit 1; }

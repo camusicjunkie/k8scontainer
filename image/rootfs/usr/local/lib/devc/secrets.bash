@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# Shared by secrets, with-secrets and devc-vault-pass (ADR 0002): the Secrets
+# Shared by secrets, with-secrets and devc-vault-pass (ADR 0001): the Secrets
 # File is an ansible-vault file whose password is a hash of the forwarded
 # agent's signature over a fixed challenge, made with the key whose fingerprint
 # is DEVC_UNLOCK_KEY.
@@ -18,7 +18,7 @@ require_agent() {
         ssh-add -l >/dev/null 2>&1 || rc=$?
     fi
     ((rc != 2)) ||
-        die "no forwarded SSH agent in this shell (SSH_AUTH_SOCK is unset or dead). Use a VS Code terminal; docker exec shells can't unlock the Secrets File."
+        die "no forwarded SSH agent in this shell (SSH_AUTH_SOCK is unset or dead). Connect with Remote-SSH and forward the smartcard agent; shells without it (kubectl exec) can't unlock the Secrets File."
 }
 
 # unlock_pubkey FILE: writes the agent's public key for DEVC_UNLOCK_KEY to FILE
@@ -26,7 +26,7 @@ require_agent() {
 unlock_pubkey() {
     local out=$1 line fp type
     [[ -n ${DEVC_UNLOCK_KEY:-} ]] ||
-        die "DEVC_UNLOCK_KEY isn't set. Put the fingerprint of your card's PIV Authentication key (ssh-add -l shows it) in ~/.devc/personal/personal.env, then Rebuild Container."
+        die "DEVC_UNLOCK_KEY isn't set. Put the fingerprint of your card's PIV Authentication key (ssh-add -l shows it) in ~/.devc/personal/personal.env, then reconnect so a new login shell loads it."
     while IFS= read -r line; do
         read -r _ fp _ < <(ssh-keygen -lf - <<<"$line")
         [[ $fp == "$DEVC_UNLOCK_KEY" ]] || continue

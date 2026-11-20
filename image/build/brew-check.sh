@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # brew-check.sh IN OUT: decides what of the brew builder stage's output may
-# enter the Standard Image (ADR 0001). Runs on the DHI base, so the loader and
+# enter the Standard Image. Runs on the DHI base, so the loader and
 # glibc it checks against are the ones the image will use.
 #
 # A binary may be static, or linked only against glibc's own libraries: Homebrew

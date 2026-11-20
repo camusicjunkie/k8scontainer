@@ -7,11 +7,10 @@
 set -uo pipefail
 
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# shellcheck source=lib.sh
+source "$repo/tests/lib.sh"
 image=${IMAGE:-}
-failed=()
 
-pass() { printf 'ok   %s\n' "$1"; }
-fail() { printf 'FAIL %s\n' "$1"; failed+=("$1"); }
 
 if [[ -z $image ]]; then
     image=devc-standard:test
