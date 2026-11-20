@@ -71,6 +71,10 @@ all_from = re.findall(r"^FROM\s+(\S+)", dockerfile, re.M | re.I)
 check("every FROM names a base by ARG", len(bases) == len(all_from), f"{len(all_from) - len(bases)} literal FROM")
 unpinned = [f"{a}={args.get(a)}" for a, _ in bases if "@sha256:" not in args.get(a, "")]
 check("every base image is pinned by digest", not unpinned, ", ".join(unpinned))
+# buildah in CI has no search registries, so a short name (homebrew/brew) fails
+# there with "short-name resolution enforced" even though docker build passes.
+short = [f"{a}={args.get(a)}" for a, _ in bases if "." not in args.get(a, "").split("/")[0]]
+check("every base image names its registry (no short names)", not short, ", ".join(short))
 check("DHI_BASE is the DHI debian-base", args.get("DHI_BASE", "").startswith("dhi.io/debian-base:"),
       args.get("DHI_BASE", "missing"))
 BUILDERS = {"HADOLINT_IMAGE": "hadolint", "BREW_IMAGE": "brew"}
