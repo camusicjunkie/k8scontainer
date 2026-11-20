@@ -12,8 +12,9 @@
 # admin from the Roster removes the Pod and keeps the volume, and adding them
 # back finds their state.
 #
-# Pushes a new tag to REGISTRY (through DOCKER_NETWORK) and lets the
-# automation commit to the synced branch. Needs kubectl, ssh and docker.
+# Pushes a new tag to REGISTRY (through DOCKER_NETWORK), lets the automation
+# commit to its push branch, and fast-forwards the synced branch to it as
+# merging the update would. Needs kubectl, ssh and docker.
 set -uo pipefail
 ctx=${KUBE_CONTEXT:-kind-devc}
 state=${STATE_DIR:-$HOME/.cache/devc-kind}
@@ -34,11 +35,29 @@ reconcile() {  # ask Flux to act now rather than at its next interval
     k -n flux-system annotate gitrepository/k8scontainer kustomization/devcontainer \
         reconcile.fluxcd.io/requestedAt="$at" --overwrite >/dev/null
     k -n $ns annotate imagerepository/devcontainer-standard imageupdateautomation/devcontainer \
-        resourcesetinputprovider/roster resourceset/devcontainer reconcile.fluxcd.io/requestedAt="$at" --overwrite >/dev/null 2>&1
+        gitrepository/k8scontainer-push resourcesetinputprovider/roster resourceset/devcontainer reconcile.fluxcd.io/requestedAt="$at" --overwrite >/dev/null 2>&1
 }
 until_true() {  # until_true SECONDS COMMAND: retries, reconciling Flux each time
     local end=$((SECONDS + $1)); shift
     until eval "$*"; do ((SECONDS < end)) || return 1; reconcile; sleep 5; done
+}
+# Fast-forward the synced branch to the automation's push branch once that
+# carries TAG, as merging the update would. The credentials go from the
+# cluster's secret to the container's environment, never onto a command line.
+merge_updates() {  # merge_updates TAG
+    local url branch push
+    url=$(k -n flux-system get gitrepository k8scontainer -o jsonpath='{.spec.url}')
+    branch=$(k -n flux-system get gitrepository k8scontainer -o jsonpath='{.spec.ref.branch}')
+    push=$(k -n $ns get imageupdateautomation devcontainer -o jsonpath='{.spec.git.push.branch}')
+    GIT_USER=$(k -n $ns get secret devc-git-push -o jsonpath='{.data.username}' | base64 -d) \
+    GIT_PASS=$(k -n $ns get secret devc-git-push -o jsonpath='{.data.password}' | base64 -d) \
+    docker run --rm --network "$network" --entrypoint sh -e GIT_USER -e GIT_PASS \
+        -e URL="$url" -e BRANCH="$branch" -e PUSH="$push" -e TAG="$1" alpine/git:v2.49.1 -c '
+        cred="!f() { echo username=\$GIT_USER; echo password=\$GIT_PASS; }; f"
+        git init -q /r && cd /r &&
+        git -c credential.helper="$cred" fetch -q "$URL" "$PUSH" &&
+        git show FETCH_HEAD:manifests/devcontainer/roster.yaml | grep -qF ":$TAG " &&
+        git -c credential.helper="$cred" push -q "$URL" "FETCH_HEAD:refs/heads/$BRANCH"' >/dev/null 2>&1
 }
 pod_image() { k -n $ns get pod devc-admin-0 -o jsonpath='{.spec.containers[0].image}' 2>/dev/null; }
 sts_image() { k -n $ns get sts devc-admin -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null; }
@@ -79,8 +98,8 @@ echo "== a new Release"
 old=$(pod_image); old_tag=${old##*:}
 new_tag=0.1.$(date +%s)
 crane copy "$registry/$repo_path:$old_tag" "$registry/$repo_path:$new_tag" >/dev/null 2>&1
-check "the automation commits $new_tag and the StatefulSet template follows" \
-    "until_true 300 '[[ \$(sts_image) == *:$new_tag ]]'"
+check "the automation commits $new_tag to its push branch, and it merges" "until_true 300 'merge_updates $new_tag'"
+check "the StatefulSet template follows the merge to $new_tag" "until_true 180 '[[ \$(sts_image) == *:$new_tag ]]'"
 check "the running Pod keeps $old_tag until its admin restarts it (OnDelete)" "[[ \$(pod_image) == '$old' ]]"
 check "after a restart the Pod runs $new_tag" "restart && [[ \$(pod_image) == *:$new_tag ]]"
 check "and its State Directory is still there" "[[ \$(pod_ssh 'cat ~/workspace/note') == kept ]]"

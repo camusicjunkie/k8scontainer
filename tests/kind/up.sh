@@ -18,9 +18,12 @@
 # network, so it can also reach a Git server there (the local GitLab).
 #
 # With GIT_URL (plus GIT_BRANCH, GIT_USER, GIT_TOKEN) it also applies
-# tests/kind/flux.yaml: Flux syncs manifests/devcontainer from that branch and
-# the image automation pushes to it, so use a throwaway branch. The test's SSH
-# key is kept in STATE_DIR.
+# tests/kind/flux.yaml: Flux syncs manifests/devcontainer from GIT_BRANCH and
+# the image automation pushes to GIT_PUSH_BRANCH (default
+# GIT_BRANCH-image-updates), which tests/cluster-live.sh merges back, so use
+# throwaway branches. GIT_PUSH_TOKEN, if set, is the push credential; it
+# defaults to GIT_TOKEN, which a lab may give both. The test's SSH key is kept
+# in STATE_DIR.
 set -euo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 name=${KIND_CLUSTER:-devc}
@@ -36,6 +39,8 @@ for t in kind kubectl flux-operator docker envsubst; do
     command -v "$t" >/dev/null || { echo "missing: $t"; exit 1; }
 done
 [[ -d $gitops/apps/kyverno/configs ]] || { echo "GITOPS_DIR has no apps/kyverno/configs: $gitops"; exit 1; }
+! grep -rq 'request\.object\.metadata\.namespace' "$gitops/apps/kyverno/configs" \
+    || { echo "GITOPS_DIR's image rewrite policy predates the request.namespace fix: $gitops"; exit 1; }
 
 if ! kind get clusters 2>/dev/null | grep -qx "$name"; then
     kind create cluster --name "$name" --wait 120s --config - <<EOF
@@ -97,16 +102,12 @@ k -n kyverno rollout status deploy/kyverno-background-controller --timeout 300s
 export KYVERNO_VALIDATION_ACTION=Audit HARBOR_REGISTRY=$registry HARBOR_PROJECT=$harbor_project
 k -n flux-system create secret docker-registry harbor-pull --docker-server "$registry" \
     --docker-username kind --docker-password kind --dry-run=client -o yaml | k apply -f - >/dev/null
-# Two local changes, both printed:
-# - request.namespace for request.object.metadata.namespace: Kyverno's autogen
-#   turns the latter into spec.template.metadata.namespace on StatefulSets and
-#   Deployments, which no Pod template has, so the image rewrite rejects them.
-# - kind's local-path-storage joins the exclusions: its PVC helper image is
-#   not mirrored to the registry.
+# One local change, printed: local-path-storage, flux-system and kyverno join
+# the exclusions. Here their images come from public registries and are not
+# mirrored to REGISTRY; on the Management Cluster they already come from Harbor.
 k kustomize "$gitops/apps/kyverno/configs" \
     | envsubst '$KYVERNO_VALIDATION_ACTION $HARBOR_REGISTRY $HARBOR_PROJECT' \
-    | sed -e 's/request\.object\.metadata\.namespace/request.namespace/g' \
-          -e 's/^\( *\)- kube-node-lease$/&\n\1- local-path-storage/' \
+    | sed -e 's/^\( *\)- kube-node-lease$/&\n\1- local-path-storage\n\1- flux-system\n\1- kyverno/' \
     | tee "${TMPDIR:-/tmp}/devc-kind-policies.yaml" | k apply -f -
 echo "local changes to the Gitops policies:"
 k kustomize "$gitops/apps/kyverno/configs" \
@@ -118,12 +119,15 @@ if [[ -n ${GIT_URL:-} ]]; then
     echo "== Flux sync from $GIT_URL ${GIT_BRANCH:?}"
     mkdir -p "$state"
     [[ -f $state/id_rsa ]] || ssh-keygen -q -t rsa -b 2048 -N '' -C test-smartcard -f "$state/id_rsa"
-    k -n flux-system create secret generic devc-git --from-literal=username="${GIT_USER:?}" \
+    k -n flux-system create secret generic devc-git-read --from-literal=username="${GIT_USER:?}" \
         --from-literal=password="${GIT_TOKEN:?}" --dry-run=client -o yaml | k apply -f - >/dev/null
     # The automation lives in the namespace the Kustomization creates.
     k create namespace devcontainer --dry-run=client -o yaml | k apply -f - >/dev/null
-    export GIT_URL GIT_BRANCH REGISTRY=$registry TEST_PUBKEY=$(cat "$state/id_rsa.pub")
-    envsubst '$GIT_URL $GIT_BRANCH $REGISTRY $HARBOR_PROJECT $TEST_PUBKEY' <"$here/flux.yaml" | k apply -f -
+    k -n devcontainer create secret generic devc-git-push --from-literal=username="$GIT_USER" \
+        --from-literal=password="${GIT_PUSH_TOKEN:-$GIT_TOKEN}" --dry-run=client -o yaml | k apply -f - >/dev/null
+    export GIT_URL GIT_BRANCH GIT_PUSH_BRANCH=${GIT_PUSH_BRANCH:-$GIT_BRANCH-image-updates} \
+        REGISTRY=$registry TEST_PUBKEY=$(cat "$state/id_rsa.pub")
+    envsubst '$GIT_URL $GIT_BRANCH $GIT_PUSH_BRANCH $REGISTRY $HARBOR_PROJECT $TEST_PUBKEY' <"$here/flux.yaml" | k apply -f -
     k -n flux-system wait kustomization/devcontainer --for=condition=Ready --timeout 300s
 fi
 

@@ -1,11 +1,12 @@
 # What the Management Cluster's image automation watches for the Standard Image.
 # ImageRepository scans this side's Harbor for tags; ImagePolicy picks the
 # newest Release tag. An ImageUpdateAutomation rewrites the one marked
-# `image:` line in roster.yaml to the policy's choice, and the ResourceSet
-# renders it into every admin's StatefulSet template. It holds Git push
-# credentials, so it is not in this directory; it must sit in this namespace
-# (it applies only ImagePolicies in its own) with a GitRepository for this
-# repository. tests/kind/flux.yaml is a working one.
+# `image:` line in roster.yaml to the policy's choice on a push branch, and
+# once that is merged the ResourceSet renders it into every admin's
+# StatefulSet template. It holds Git push credentials, so it is not in this
+# directory; it must sit in this namespace (it applies only ImagePolicies in
+# its own) beside a GitRepository with its own write credential.
+# tests/kind/flux.yaml is a working one.
 #
 # Rollback: pin an earlier tag by narrowing `range` to that exact version
 # (for example "0.1.0"); the automation then rewrites the Roster to it. Setting

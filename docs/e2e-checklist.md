@@ -6,7 +6,7 @@ Record the date, the Release version, who ran it, the result of every step and a
 
 ## Setup
 
-- **Management Cluster** on the Disconnected Side with Flux (including the image controllers and an ImageUpdateAutomation for this repository in the `devcontainer` namespace; see the Release Owner guide), Kyverno, Istio ambient and Gateway API CRDs.
+- **Management Cluster** on the Disconnected Side with Flux (including the image controllers and an ImageUpdateAutomation for this repository in the `devcontainer` namespace, pushing to `image-updates` with its own write credential; see the Release Owner guide), Kyverno, Istio ambient and Gateway API CRDs.
 - **Two test admins** on the Roster, with real smartcards, different ports. Call them A and B.
 - **A Workstation** with the Windows OpenSSH agent holding the card's keys, and the Release's Workstation pack.
 - **Two Releases** already imported (the one under test and the one before it), for sections 7 and 9. Have kubectl access to the Management Cluster for the checks that say so.
@@ -24,7 +24,7 @@ Record the date, the Release version, who ran it, the result of every step and a
 
 - [ ] **[unverified]** The Flux Operator reports the ResourceSet `devcontainer` Ready, and the inventory holds, per admin, a StatefulSet, a key list, two Services and a TCPRoute, plus one Gateway.
 - [ ] **[unverified]** The Devcontainer Namespace enforces Pod Security `restricted` (label `pod-security.kubernetes.io/enforce=restricted`) and the Pods start under it: `kubectl -n devcontainer get pods` shows `devc-<name>-0` Running with no admission warnings.
-- [ ] **[unverified]** The existing Kyverno policies admit the Pods and the other generated objects (no policy violation reports for the namespace). On kind, the image rewrite policy as committed rejected the StatefulSet (`request.object.metadata.namespace` under Kyverno's autogen); check the cluster runs a fixed one.
+- [ ] **[unverified]** The existing Kyverno policies admit the Pods and the other generated objects (no policy violation reports for the namespace). The image rewrite policy must use `request.namespace`: with `request.object.metadata.namespace`, Kyverno's autogen rejects the StatefulSet (seen on kind).
 - [ ] **[unverified]** The Istio ambient label is on the namespace and the Pods are enrolled in the mesh (check with the mesh's own tooling).
 - [ ] **[unverified]** The `standard` StorageClass binds each admin's claim `state-devc-<name>-0`.
 - [ ] **[unverified]** The cluster's Gateway API CRDs serve `TCPRoute` at `v1alpha2` (the version the ResourceSet renders). If not, record which version it serves.
@@ -76,11 +76,11 @@ Record the date, the Release version, who ran it, the result of every step and a
 ## 8. Update to a new Release, then rollback
 
 - [ ] **[unverified]** With Release N running, push Release N+1's tag to the Connected Harbor and import it on the Disconnected Side. Within the scan interval, the ImageRepository lists the new tag and the ImagePolicy selects it.
-- [ ] **[unverified]** The ImageUpdateAutomation rewrites the marked `image:` line in `roster.yaml` and Flux applies it. The StatefulSet's Pod template shows the new image.
+- [ ] **[unverified]** The ImageUpdateAutomation rewrites the marked `image:` line in `roster.yaml` on the `image-updates` branch, and the StatefulSet is unchanged until that merge request is merged. After the merge Flux applies it and the StatefulSet's Pod template shows the new image.
 - [ ] **[unverified]** Running Pods were **not** restarted by the change (`kubectl -n devcontainer get pods` shows unchanged ages and the old image on A's Pod).
 - [ ] After A restarts the Pod, it runs the new image and the section 7 markers are intact. B, who did not restart, still runs the old image.
 - [ ] If the new Release carries a new VS Code commit: the old Workstation pack's VS Code gets a mismatch, and the new pack's `install.ps1 -From <old folder>` fixes it and carries settings forward.
-- [ ] **Rollback:** narrow the ImagePolicy `range` to the exact earlier version, merge, and confirm the automation rewrites the Roster to it. After A restarts, the Pod runs the earlier image with state intact. Restore `">=0.1.0"` and confirm it moves forward again.
+- [ ] **Rollback:** narrow the ImagePolicy `range` to the exact earlier version, merge, and confirm the automation rewrites the Roster to it on `image-updates`; merge that. After A restarts, the Pod runs the earlier image with state intact. Restore `">=0.1.0"` and confirm it moves forward again.
 - [ ] Changing a certificate authority in Site Config does not change running Pods; after a restart the Pod trusts the new CA.
 
 ## 9. Limits and failure checks

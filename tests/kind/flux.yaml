@@ -1,7 +1,8 @@
-# What tests/kind/up.sh applies when GIT_URL is set: Flux syncs
-# manifests/devcontainer from a branch the test may push to, with the
-# registry and the test's key patched in, and the image automation commits
-# Roster updates back to that branch. envsubst fills ${...}.
+# What tests/kind/up.sh applies when GIT_URL is set, shaped as the Management
+# Cluster should run it: Flux syncs manifests/devcontainer from GIT_BRANCH
+# with a read-only credential, and the image automation commits Roster
+# updates to GIT_PUSH_BRANCH with its own write credential, for someone to
+# merge. envsubst fills ${...}.
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository
 metadata:
@@ -13,7 +14,7 @@ spec:
   ref:
     branch: ${GIT_BRANCH}
   secretRef:
-    name: devc-git
+    name: devc-git-read
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
@@ -22,7 +23,10 @@ metadata:
   namespace: flux-system
 spec:
   interval: 1m
+  retryInterval: 1m
+  timeout: 5m
   prune: true
+  wait: true
   sourceRef:
     kind: GitRepository
     name: k8scontainer
@@ -38,9 +42,23 @@ spec:
       patch: |
         - { op: replace, path: /spec/defaultValues/admins/0/publicKey, value: "${TEST_PUBKEY}" }
 ---
-# In the devcontainer namespace: an ImageUpdateAutomation applies only the
-# ImagePolicies in its own namespace, and the Roster's marker names
-# devcontainer:devcontainer-standard.
+# The automation and its source sit in the devcontainer namespace: an
+# ImageUpdateAutomation applies only the ImagePolicies in its own namespace
+# (the Roster's marker names devcontainer:devcontainer-standard), and a
+# source beside it needs no cross-namespace reference.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: k8scontainer-push
+  namespace: devcontainer
+spec:
+  interval: 10m
+  url: ${GIT_URL}
+  ref:
+    branch: ${GIT_BRANCH}
+  secretRef:
+    name: devc-git-push
+---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageUpdateAutomation
 metadata:
@@ -50,17 +68,17 @@ spec:
   interval: 1m
   sourceRef:
     kind: GitRepository
-    name: k8scontainer
-    namespace: flux-system
+    name: k8scontainer-push
   git:
     checkout:
       ref:
         branch: ${GIT_BRANCH}
     commit:
       author: { email: fluxcdbot@users.noreply.github.com, name: fluxcdbot }
+      # Only the Roster changes, so no image build; merging runs the pipeline.
       messageTemplate: "chore(images): update automated image tags [skip ci]"
     push:
-      branch: ${GIT_BRANCH}
+      branch: ${GIT_PUSH_BRANCH}
   update:
     path: ./manifests/devcontainer
     strategy: Setters
