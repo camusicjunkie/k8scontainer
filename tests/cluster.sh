@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# Cluster seam: validates the manifests under manifests/devcontainer.
+# Cluster seam: validates the manifests under manifests/devcontainer and what
+# the ResourceSet generates from sample Rosters (tests/rosters: 1 admin, 2
+# admins with a resource override, and 2 minus one).
 #
 #   tests/cluster.sh
 #
-# Needs kubectl (for `kustomize`), Docker and python3 with PyYAML. First run
+# Needs kubectl (for `kustomize`), the flux-operator CLI (renders the
+# ResourceSet with the real templating engine), Docker and python3 with PyYAML. First run
 # needs network (pulls kubeconform, which fetches the Kubernetes schemas).
 # Steps: render with kustomize; validate against the Kubernetes schemas with
 # kubeconform; check the Pod Security `restricted` fields and the ticket's
@@ -24,25 +27,58 @@ bad() { echo "FAIL $1"; failed=1; }
 work=$(mktemp -d)
 vol=devc-cluster-test-$$
 trap 'rm -rf "$work"; docker volume rm "$vol" >/dev/null 2>&1' EXIT
-rendered=$work/rendered.yaml
 
-if ! kubectl kustomize "$(native "$repo/manifests/devcontainer")" >"$rendered" 2>"$work/err"; then
-    bad "kustomize renders manifests/devcontainer"; cat "$work/err"; exit 1
-fi
-ok "kustomize renders manifests/devcontainer"
-
-# Gateway API kinds come from the CRDs catalog (also fetched over the network).
-if docker run --rm -i ghcr.io/yannh/kubeconform:latest-alpine -strict -summary \
-        -kubernetes-version "$kube_version" -schema-location default \
-        -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-        - <"$rendered"; then
-    ok "kubeconform: manifests match the Kubernetes $kube_version and Gateway API schemas"
-else
-    bad "kubeconform"
+if ! command -v flux-operator >/dev/null; then
+    bad "flux-operator CLI is on PATH (renders the ResourceSet; see https://fluxoperator.dev/docs/cli/)"; exit 1
 fi
 
-"$py" -I "$(native "$repo/tests/cluster_policy.py")" <"$rendered" || failed=1
+# render ROSTER OUT: the Namespace and Site Config (kustomize; the Roster and
+# ResourceSet objects are what the cluster applies, so they are dropped from
+# the output) followed by what the ResourceSet generates from that Roster,
+# evaluated by the real flux-operator templating engine.
+render() {
+    kubectl kustomize "$(native "$repo/manifests/devcontainer")" 2>"$work/err" | "$py" -I -c '
+import sys, yaml
+docs = [d for d in yaml.safe_load_all(sys.stdin) if d and d["kind"] not in ("ResourceSet", "ResourceSetInputProvider")]
+sys.stdout.write(yaml.safe_dump_all(docs))' >"$2" || { cat "$work/err"; return 1; }
+    echo --- >>"$2"
+    flux-operator build resourceset -f "$(native "$repo/manifests/devcontainer/resourceset.yaml")" \
+        --inputs-from-provider "$(native "$1")" >>"$2" 2>"$work/err" || { cat "$work/err"; return 1; }
+}
 
+# The committed Roster is a sample too.
+for roster in "$repo/tests/rosters/one.yaml" "$repo/tests/rosters/two.yaml" \
+              "$repo/tests/rosters/two-minus-alice.yaml" "$repo/manifests/devcontainer/roster.yaml"; do
+    label=${roster#"$repo/"}
+    out=$work/$(basename "$roster")
+    echo "== $label"
+    if render "$roster" "$out"; then ok "$label: kustomize and the ResourceSet render"
+    else bad "$label: kustomize and the ResourceSet render"; continue; fi
+
+    # Gateway API kinds come from the CRDs catalog (also fetched over the network).
+    if docker run --rm -i ghcr.io/yannh/kubeconform:latest-alpine -strict -summary \
+            -kubernetes-version "$kube_version" -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            - <"$out"; then
+        ok "$label: kubeconform: output matches the Kubernetes $kube_version and Gateway API schemas"
+    else
+        bad "$label: kubeconform"
+    fi
+    "$py" -I "$(native "$repo/tests/cluster_policy.py")" "$(native "$roster")" <"$out" || failed=1
+done
+
+# Removing an entry removes that admin's Pod, route and everything else named for them.
+if grep -q 'alice' "$work/two-minus-alice.yaml" || ! grep -q 'alice' "$work/two.yaml"; then
+    bad "removing alice from the Roster drops every object and listener generated for her"
+else ok "removing alice from the Roster drops every object and listener generated for her"; fi
+
+# Image update flow: the marker and policy, and that a new tag (or a pinned
+# earlier one) changes only the Pod template image.
+if render "$repo/tests/rosters/one-older-tag.yaml" "$work/one-older-tag.yaml"; then
+    "$py" -I "$(native "$repo/tests/cluster_update.py")" "$(native "$repo/manifests/devcontainer/roster.yaml")" \
+        "$(native "$work/one-older-tag.yaml")" "$(native "$work/one.yaml")" || failed=1
+else bad "one-older-tag.yaml renders"; fi
+rendered=$work/one.yaml
 if ! docker image inspect "$image" >/dev/null 2>&1; then
     echo "skip image behaviour: $image not present locally"
     exit $failed

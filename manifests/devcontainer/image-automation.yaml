@@ -1,0 +1,37 @@
+# What the Management Cluster's image automation watches for the Standard Image.
+# ImageRepository scans this side's Harbor for tags; ImagePolicy picks the
+# newest Release tag. The existing ImageUpdateAutomation (it owns the Git
+# credentials and branch, so it lives with the Gitops repository, not here)
+# rewrites the one marked `image:` line in roster.yaml to the policy's choice,
+# and the ResourceSet renders it into every admin's StatefulSet template.
+#
+# Rollback: pin an earlier tag by narrowing `range` to that exact version
+# (for example "0.1.0"); the automation then rewrites the Roster to it. Setting
+# `range` back to ">=0.1.0" resumes following new Releases. Editing the Roster's
+# image alone does not stick, the automation would move it forward again.
+#
+# If the registry needs a pull credential, add spec.secretRef to the
+# ImageRepository (a dockerconfigjson Secret in this namespace, supplied
+# outside Git).
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: devcontainer-standard
+  namespace: devcontainer
+spec:
+  image: harbor.example/devcontainer/standard
+  interval: 5m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: devcontainer-standard
+  namespace: devcontainer
+spec:
+  imageRepositoryRef:
+    name: devcontainer-standard
+  policy:
+    semver:
+      # Release tags are plain MAJOR.MINOR.PATCH. A range without a
+      # pre-release part never selects a pre-release tag.
+      range: ">=0.1.0"
