@@ -18,6 +18,7 @@ less
 nano
 netcat-openbsd
 openssh-client
+openssh-server
 openssl
 procps
 qemu-utils

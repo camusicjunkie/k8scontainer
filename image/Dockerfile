@@ -2,7 +2,7 @@
 # The Standard Image. `docker build image/` builds it with the pins below as
 # defaults; CI overrides DEVC_VERSION and DEVC_GIT_SHA. Nothing in the image
 # reaches the network at runtime. It runs as a non-root user and has no sudo.
-# Not in this image yet: sshd (ticket 02), the VS Code server and extensions
+# Not in this image yet: the VS Code server and extensions
 # (ticket 03), and kubectl-vsphere (it needs a Supervisor's plugin zip).
 
 ARG DHI_BASE=debian:trixie-slim
@@ -232,7 +232,13 @@ ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
     REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
     NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
 
+# The non-root sshd (devc-sshd): the Roster's key list is mounted at
+# /etc/devc/authorized_keys and the host key lives on the admin's volume.
+RUN install -d /etc/devc \
+    && install -d -o dev -g dev -m 0700 /var/lib/devc/hostkeys
+EXPOSE 2222
+
 USER dev
 WORKDIR /home/dev
 ENTRYPOINT ["/usr/local/bin/devc-entrypoint"]
-CMD ["/bin/bash", "-l"]
+CMD ["devc-sshd"]

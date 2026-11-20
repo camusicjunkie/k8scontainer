@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# devc-sshd: runs the image's non-root sshd in the foreground. Only public keys
+# from the mounted key list log in, and only as the user running this. The host
+# key is read from DEVC_HOSTKEY_DIR and created there once, on first start.
+#   DEVC_SSHD_PORT        listen port (2222)
+#   DEVC_SSHD_LISTEN      listen address (0.0.0.0)
+#   DEVC_AUTHORIZED_KEYS  key list (/etc/devc/authorized_keys)
+#   DEVC_HOSTKEY_DIR      host key directory (/var/lib/devc/hostkeys)
+set -euo pipefail
+
+port=${DEVC_SSHD_PORT:-2222}
+listen=${DEVC_SSHD_LISTEN:-0.0.0.0}
+keys=${DEVC_AUTHORIZED_KEYS:-/etc/devc/authorized_keys}
+hostdir=${DEVC_HOSTKEY_DIR:-/var/lib/devc/hostkeys}
+user=$(id -un)
+
+if [[ $(id -u) -eq 0 ]]; then
+    echo "devc-sshd: refusing to start as root" >&2
+    exit 1
+fi
+
+hostkey=$hostdir/ssh_host_ed25519_key
+if [[ ! -s $hostkey ]]; then
+    mkdir -p "$hostdir"
+    # Written beside the final name and moved into place, so a start that dies
+    # half-way never leaves a truncated key behind.
+    rm -f "$hostkey.new" "$hostkey.new.pub"
+    ssh-keygen -q -t ed25519 -N '' -C devc-host-key -f "$hostkey.new"
+    mv "$hostkey.new.pub" "$hostkey.pub"
+    mv "$hostkey.new" "$hostkey"
+fi
+
+conf=$(mktemp)
+cat >"$conf" <<CONF
+Port $port
+ListenAddress $listen
+HostKey $hostkey
+PidFile none
+AuthorizedKeysFile $keys
+StrictModes no
+AuthenticationMethods publickey
+PubkeyAuthentication yes
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitEmptyPasswords no
+PermitRootLogin no
+UsePAM no
+AllowUsers $user
+AllowAgentForwarding yes
+AllowTcpForwarding yes
+X11Forwarding no
+PrintMotd no
+AcceptEnv LANG LC_*
+Subsystem sftp /usr/lib/openssh/sftp-server
+CONF
+
+exec /usr/sbin/sshd -D -e -f "$conf"
