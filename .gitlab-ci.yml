@@ -39,6 +39,17 @@ stages: [build, test, publish]
 variables:
   CANDIDATE: $CI_REGISTRY_IMAGE/candidate:$CI_COMMIT_SHA
 
+# The repo's file checks (tests/all.sh --files): the pipeline's own rules, the
+# contracts between image and manifests, and the docs. No image needed, so it
+# starts at once, and a Release publishes only if it passed too.
+checks:
+  stage: test
+  needs: []
+  image: python:3.12.8-slim-bookworm
+  script:
+    - pip install --quiet pyyaml==6.0.2
+    - bash tests/all.sh --files
+
 build:
   stage: build
   image: quay.io/buildah/stable:v1.46.1
@@ -73,7 +84,7 @@ selftest:
 
 publish:
   stage: publish
-  needs: [selftest]
+  needs: [selftest, checks]
   image:
     name: quay.io/skopeo/stable:v1.25.1
     entrypoint: [""]

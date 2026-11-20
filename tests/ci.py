@@ -108,13 +108,13 @@ def jobs_for(cfg, env):
 
 
 REFS = {
-    "push to main": ({"CI_COMMIT_BRANCH": "main", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest"}),
-    "push to a feature branch": ({"CI_COMMIT_BRANCH": "feat/x", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest"}),
-    "merge request": ({"CI_PIPELINE_SOURCE": "merge_request_event", "CI_MERGE_REQUEST_IID": "3"}, {"build", "selftest"}),
-    "Release tag v1.2.3": ({"CI_COMMIT_TAG": "v1.2.3", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "publish"}),
-    "Release tag 2026.11.2": ({"CI_COMMIT_TAG": "2026.11.2", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "publish"}),
-    "non-Release tag 'wip'": ({"CI_COMMIT_TAG": "wip", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest"}),
-    "tag 'v1.2.3-oops'": ({"CI_COMMIT_TAG": "v1.2.3-oops", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest"}),
+    "push to main": ({"CI_COMMIT_BRANCH": "main", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks"}),
+    "push to a feature branch": ({"CI_COMMIT_BRANCH": "feat/x", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks"}),
+    "merge request": ({"CI_PIPELINE_SOURCE": "merge_request_event", "CI_MERGE_REQUEST_IID": "3"}, {"build", "selftest", "checks"}),
+    "Release tag v1.2.3": ({"CI_COMMIT_TAG": "v1.2.3", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks", "publish"}),
+    "Release tag 2026.11.2": ({"CI_COMMIT_TAG": "2026.11.2", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks", "publish"}),
+    "non-Release tag 'wip'": ({"CI_COMMIT_TAG": "wip", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks"}),
+    "tag 'v1.2.3-oops'": ({"CI_COMMIT_TAG": "v1.2.3-oops", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks"}),
 }
 
 failed = []
@@ -151,8 +151,11 @@ else:
           re.search(r"DHI_USER[\s\S]*--password-stdin dhi\.io", build) is not None)
     check("DHI credentials appear only in the build job", all(
         "DHI_" not in yaml.dump(j) for n, j in cfg.items() if isinstance(j, dict) and n != "build"))
-    check("publish waits on the self-test", "selftest" in [
-        n if isinstance(n, str) else n.get("job") for n in cfg.get("publish", {}).get("needs", [])])
+    publish_needs = [n if isinstance(n, str) else n.get("job") for n in cfg.get("publish", {}).get("needs", [])]
+    check("publish waits on the self-test", "selftest" in publish_needs)
+    check("publish waits on the repo checks", "checks" in publish_needs)
+    check("the checks job runs tests/all.sh --files",
+          "tests/all.sh --files" in "\n".join(cfg.get("checks", {}).get("script", [])))
     check("Harbor credentials appear only in the publish job", all(
         "HARBOR" not in yaml.dump(j) for n, j in cfg.items() if isinstance(j, dict) and n != "publish"))
     check("every literal image is pinned to a version", all(

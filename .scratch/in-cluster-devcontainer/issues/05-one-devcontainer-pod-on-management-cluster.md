@@ -6,11 +6,11 @@
 
 **Status:** resolved
 
-- [ ] The Devcontainer Namespace enforces Pod Security `restricted` and the Pod runs under it
-- [ ] The Pod is a one-replica StatefulSet with the `OnDelete` update strategy, pulling the image from the Registry
-- [ ] The volume is mounted only at the specific paths the spec lists, and content written there survives a Pod restart
-- [ ] Site Config is a read-only ConfigMap and its certificate authorities are trusted in the Pod
-- [ ] The manifests pass the cluster seam's schema and policy checks, including the existing Kyverno policies
+- [ ] The Devcontainer Namespace enforces Pod Security `restricted` and the Pod runs under it **[unverified]** (e2e section 2: real admission and Pod startup)
+- [x] The Pod is a one-replica StatefulSet with the `OnDelete` update strategy, pulling the image from the Registry
+- [x] The volume is mounted only at the specific paths the spec lists, and content written there survives a Pod restart
+- [x] Site Config is a read-only ConfigMap and its certificate authorities are trusted in the Pod
+- [ ] The manifests pass the cluster seam's schema and policy checks, including the existing Kyverno policies **[unverified]** (e2e section 2: Kyverno policies)
 
 ## Answer
 
