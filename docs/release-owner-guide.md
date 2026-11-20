@@ -14,11 +14,15 @@ For the Release Owner (and the named backup). Terms are those of `GLOSSARY.md`. 
 
 **Protect the Release tag pattern** (`v*` and `[0-9]*`, matching `vX.Y.Z` and `X.Y.Z`) so only you can create it. Pushing a Release tag is the gate: nothing reaches a Registry until you do.
 
-**Runner needs** (from `.gitlab-ci.yml`, checked locally but not on the real runner): the job container must be allowed user namespaces (seccomp must not block `unshare`) and be given a `/dev/fuse` device, because buildah overlays the build context for `RUN --mount=type=bind`. It needs neither `--privileged` nor a Docker daemon.
+**Runner needs** (from `.gitlab-ci.yml`): the job container must be allowed user namespaces (seccomp must not block `unshare`) and be given a `/dev/fuse` device, because buildah overlays the build context for `RUN --mount=type=bind`. It needs neither `--privileged` nor a Docker daemon. On a GitLab docker-executor runner that is `devices = ["/dev/fuse"]` and `security_opt = ["seccomp=unconfined", "apparmor=unconfined"]` under `[runners.docker]`; with Docker's default seccomp profile buildah fails with `unshare(CLONE_NEWUSER): Operation not permitted`.
 
 **`candidate` images accumulate.** Every pipeline pushes `candidate:<commit sha>` to the project's Container Registry. Add a registry cleanup policy for that repository or it grows without bound.
 
-**Unverified:** the full image build under buildah on the real runner, the push of `candidate`, the skopeo copy to the real Harbor and its credentials. The build also needs Internet and Marketplace access (it fetches the VS Code server and extensions), which is why it runs only on the Connected Side. The DHI base's registry (`dhi.io`) usually needs a login: set `DHI_USER` and `DHI_PASSWORD` (masked) to a Docker account entitled to the base, and the build logs in before it pulls. The self-test job runs buildah with rootless isolation, because chroot isolation ignores `--network none`. Checked locally under the runner needs above, but not yet on the real runner.
+**DHI login.** The DHI base's registry (`dhi.io`) needs a login: set `DHI_USER` and `DHI_PASSWORD` (masked, and raw if the token contains `$`) to a Docker account entitled to the base, and the build logs in before it pulls. Without them the build fails at the first DHI stage with `authentication required`.
+
+**Checked on a local GitLab CE with a docker-executor runner set up as above:** a branch push runs `build`, `checks` and `selftest`; the self-test passes all its checks under rootless isolation with `--network none` (chroot isolation leaves the network up); a `v0.0.1` tag also runs `publish`, and the Harbor tag carries the same digest as the `candidate` that passed. The build also needs Internet and Marketplace access (it fetches the VS Code server and extensions), which is why it runs only on the Connected Side.
+
+**Unverified:** the real runner, the real Container Registry and the real Harbor with its robot credentials.
 
 ## Before each Release
 
