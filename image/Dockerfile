@@ -2,8 +2,7 @@
 # The Standard Image. `docker build image/` builds it with the pins below as
 # defaults; CI overrides DEVC_VERSION and DEVC_GIT_SHA. Nothing in the image
 # reaches the network at runtime. It runs as a non-root user and has no sudo.
-# Not in this image yet: the VS Code server and extensions
-# (ticket 03), and kubectl-vsphere (it needs a Supervisor's plugin zip).
+# Not in this image yet: kubectl-vsphere (it needs a Supervisor's plugin zip).
 
 ARG DHI_BASE=debian:trixie-slim
 ARG BREW_IMAGE=homebrew/brew:4.6.20@sha256:b0072bfdebf5934ae24b93b44a1928a88057399b3283ffa0177bb86084fdedfd
@@ -118,6 +117,36 @@ RUN --mount=type=bind,source=packages,target=/mnt/packages \
     /opt/microsoft/powershell/7/pwsh -NoProfile -NonInteractive \
         -File /tmp/build/pwsh-modules.ps1 /mnt/packages/pwsh-modules.txt >/pwsh-module-versions.txt
 
+# ------------------------------------------------------------------ vscode
+# The VS Code server at the commit pinned in packages/vscode.env (the same pin
+# the Workstation installer reads), checked against its SHA-256, and the
+# extensions in packages/vscode-extensions.txt installed with that server. This
+# is where Remote-SSH looks, so attaching downloads nothing. Build time only.
+FROM ${DHI_BASE} AS vscode
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+# hadolint ignore=DL3008
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl jq \
+    && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=bind,source=packages,target=/mnt/packages \
+    set -a && . /mnt/packages/vscode.env && set +a \
+    && curl -fsSL -o /tmp/server.tar.gz \
+        "https://update.code.visualstudio.com/commit:${VSCODE_COMMIT}/server-linux-x64/stable" \
+    && echo "${VSCODE_SERVER_SHA256}  /tmp/server.tar.gz" | sha256sum -c - \
+    && server=/home/dev/.vscode-server/bin/${VSCODE_COMMIT} \
+    && install -d "$server" \
+    && tar -xzf /tmp/server.tar.gz --strip-components 1 -C "$server" \
+    && args=() \
+    && while read -r p; do args+=(--install-extension "$p"); done \
+        < <(grep -vE '^[[:space:]]*(#|$)' /mnt/packages/vscode-extensions.txt) \
+    && "$server/bin/code-server" --extensions-dir /home/dev/.vscode-server/extensions "${args[@]}" \
+    && jq -r '.[] | "\(.identifier.id) \(.version)"' /home/dev/.vscode-server/extensions/extensions.json \
+        | tr '[:upper:]' '[:lower:]' | LC_ALL=C sort >/extensions.txt \
+    && while read -r p; do \
+        grep -qix "${p%@*} ${p##*@}" /extensions.txt || { echo "pinned $p did not install" >&2; exit 1; }; \
+    done < <(grep -vE '^[[:space:]]*(#|$)' /mnt/packages/vscode-extensions.txt) \
+    && rm -rf /tmp/server.tar.gz
+
 # ------------------------------------------------------------------ final
 FROM ${DHI_BASE}
 
@@ -145,6 +174,7 @@ RUN --mount=type=bind,source=packages,target=/mnt/packages \
 # helper left that could hand back root.
 RUN useradd --uid 1000 --user-group --create-home --shell /bin/bash dev \
     && passwd --lock dev \
+    && install -d -o dev -g dev -m 0755 /home/dev/.local \
     && find / -xdev -perm /6000 -type f -exec chmod a-s {} +
 
 # Tools from the other stages. The real Codex binary sits off PATH:
@@ -156,6 +186,8 @@ COPY --from=hadolint /bin/hadolint /usr/local/bin/hadolint
 COPY --from=downloads /out/bin/ /usr/local/bin/
 COPY --from=downloads /out/codex/codex /usr/local/lib/codex/codex
 COPY --from=downloads /out/pwsh /opt/microsoft/powershell/7
+COPY --from=vscode --chown=1000:1000 /home/dev/.vscode-server /home/dev/.vscode-server
+COPY --from=vscode /extensions.txt /usr/local/lib/devc/extensions.txt
 COPY --from=python /opt/venv /opt/venv
 COPY --from=python /opt/python-wheels /opt/python-wheels
 COPY --from=python /usr/share/ansible/collections /usr/share/ansible/collections
@@ -197,6 +229,7 @@ RUN --mount=type=bind,source=packages,target=/mnt/packages \
         printf 'version: %s\n' "${DEVC_VERSION:?}"; \
         printf 'git_sha: %s\n' "${DEVC_GIT_SHA:?}"; \
         printf 'base: %s\n' "${DHI_BASE}"; \
+        printf 'vscode_commit: %s\n' "$(sed -n 's/^VSCODE_COMMIT=//p' /mnt/packages/vscode.env)"; \
         printf '\n## tools\n'; \
         printf 'codex %s\n' "${CODEX_VERSION:?}"; \
         printf 'hadolint %s\n' "$(hadolint --version | awk '{ print $NF }')"; \
@@ -217,6 +250,8 @@ RUN --mount=type=bind,source=packages,target=/mnt/packages \
         cat /usr/local/lib/devc/packer-versions.txt; \
         printf '\n## pwsh-modules\n'; \
         cat /usr/local/lib/devc/pwsh-module-versions.txt; \
+        printf '\n## extensions\n'; \
+        cat /usr/local/lib/devc/extensions.txt; \
     } >/etc/devcontainer/release
 
 # Trust store: only the public bundle ships. At start devc-entrypoint merges

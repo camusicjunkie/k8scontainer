@@ -68,6 +68,20 @@ else
     fail "the Docker CLI is not installed"
 fi
 
+# ----------------------------------------------------- user-owned tools area
+# ~/.local is a volume in the Pod. A tool the admin installed there in an earlier
+# session is on PATH in a new login shell, with no network and no root.
+toolvol=devc-tools-$$
+docker volume create "$toolvol" >/dev/null
+docker run --rm --network none --entrypoint bash -v "$toolvol:/home/dev/.local" "$image" -c \
+    'install -d ~/.local/bin && printf "#!/bin/sh\necho from-volume\n" >~/.local/bin/mytool && chmod +x ~/.local/bin/mytool' >/dev/null 2>&1
+if [[ $(docker run --rm --network none --entrypoint bash -v "$toolvol:/home/dev/.local" "$image" -lc mytool 2>/dev/null) == from-volume ]]; then
+    pass "a tool on the ~/.local volume is on PATH in a new login shell"
+else
+    fail "a tool on the ~/.local volume is on PATH in a new login shell"
+fi
+docker volume rm -f "$toolvol" >/dev/null 2>&1
+
 # ---------------------------------------------------------------- sshd service
 # The image's default command is the non-root sshd, with the Roster's key list
 # mounted at /etc/devc/authorized_keys and the host key dir on a volume. The

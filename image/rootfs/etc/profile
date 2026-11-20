@@ -4,6 +4,10 @@ if [ "$(id -u)" -eq 0 ]; then
 else
     PATH="/usr/local/bin:/usr/bin:/bin"
 fi
+# The user-owned tools area (~/.local on the volume): stopgap installs, no root.
+if [ "$(id -u)" -ne 0 ] && [ -d "$HOME/.local/bin" ]; then
+    PATH="$HOME/.local/bin:$PATH"
+fi
 export PATH
 
 if [ "${PS1-}" ] && [ "${BASH-}" ] && [ "$BASH" != "/bin/sh" ] && [ -f /etc/bash.bashrc ]; then
