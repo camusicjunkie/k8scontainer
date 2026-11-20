@@ -4,7 +4,7 @@
 # reaches the network at runtime. It runs as a non-root user and has no sudo.
 # Not in this image yet: kubectl-vsphere (it needs a Supervisor's plugin zip).
 
-ARG DHI_BASE=debian:trixie-slim
+ARG DHI_BASE=dhi.io/debian-base:trixie-dev@sha256:f90fd43cdf3dd94840b4dc3a2a39fd2a08578e40e7895535e2e20a1275ba6013
 ARG BREW_IMAGE=homebrew/brew:4.6.20@sha256:b0072bfdebf5934ae24b93b44a1928a88057399b3283ffa0177bb86084fdedfd
 ARG HADOLINT_IMAGE=hadolint/hadolint:v2.15.1-debian@sha256:9a3944b7fddcb947d1ffd90829ac1a6e5c30479223358f249d8b96c7d0019e27
 
@@ -170,10 +170,15 @@ RUN --mount=type=bind,source=packages,target=/mnt/packages \
     && ln -s /usr/bin/fdfind /usr/local/bin/fd \
     && ln -s /usr/bin/batcat /usr/local/bin/bat
 
-# The dev user (1000:1000). No sudo, no password, and no setuid or setgid
-# helper left that could hand back root.
-RUN useradd --uid 1000 --user-group --create-home --shell /bin/bash dev \
-    && passwd --lock dev \
+# The dev user (1000:1000). The base has no useradd, so the entries are written
+# directly. No sudo, no password, and no setuid or setgid helper left that could
+# hand back root.
+RUN printf 'dev:x:1000:1000:dev:/home/dev:/bin/bash\n' >>/etc/passwd \
+    && printf 'dev:x:1000:\n' >>/etc/group \
+    && if [[ -f /etc/shadow ]]; then printf 'dev:!:20000:0:99999:7:::\n' >>/etc/shadow; fi \
+    && install -d -o 1000 -g 1000 -m 0755 /home/dev \
+    && cp -rT /etc/skel /home/dev \
+    && chown -R 1000:1000 /home/dev \
     && install -d -o dev -g dev -m 0755 /home/dev/.local \
     && find / -xdev -perm /6000 -type f -exec chmod a-s {} +
 
