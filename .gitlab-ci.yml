@@ -1,0 +1,75 @@
+# Builds the Standard Image on the Connected Side, gates it on its self-test and
+# publishes it to the Connected Harbor when the Release Owner tags a Release.
+#
+# No privileged runner and no Docker daemon: buildah builds rootless (vfs
+# storage, chroot isolation) and skopeo copies the tested image between
+# registries. The Dockerfile uses RUN --mount=type=bind, which kaniko lacks.
+#
+# Runner needs (checked locally with Docker, not on the real runner): the build
+# container must be allowed user namespaces (seccomp not blocking unshare) and
+# a /dev/fuse device, because buildah overlays the build context for RUN
+# --mount=type=bind. It does not need --privileged or access to a daemon.
+#
+# Every ref builds and self-tests. Only a Release tag (vX.Y.Z or X.Y.Z)
+# publishes, and only the exact image that passed. Untested images never reach
+# Harbor, and an untagged push never publishes.
+#
+# Settings (Settings > CI/CD > Variables):
+#   HARBOR_IMAGE     e.g. harbor.example/devcontainer/standard (no tag)
+#   HARBOR_USER      Harbor robot account with push on that project
+#   HARBOR_PASSWORD  masked and protected
+# Protect the Release tag pattern so only the Release Owner can create it. The
+# project's Container Registry holds a `candidate` image per commit.
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+stages: [build, test, publish]
+
+variables:
+  CANDIDATE: $CI_REGISTRY_IMAGE/candidate:$CI_COMMIT_SHA
+
+build:
+  stage: build
+  image: quay.io/buildah/stable:v1.46.1
+  variables:
+    STORAGE_DRIVER: vfs
+    BUILDAH_ISOLATION: chroot
+  script:
+    - export VERSION="${CI_COMMIT_TAG:-0.0.0-$CI_COMMIT_SHORT_SHA}"
+    - >
+      buildah build
+      --build-arg "DEVC_VERSION=$VERSION"
+      --build-arg "DEVC_GIT_SHA=$CI_COMMIT_SHA"
+      --tag "$CANDIDATE" image
+    - buildah login --username "$CI_REGISTRY_USER" --password "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - buildah push "$CANDIDATE" "docker://$CANDIDATE"
+
+selftest:
+  stage: test
+  needs: [build]
+  image:
+    name: $CANDIDATE
+    entrypoint: [""]
+  script:
+    - devc-selftest
+
+publish:
+  stage: publish
+  needs: [selftest]
+  image:
+    name: quay.io/skopeo/stable:v1.25.1
+    entrypoint: [""]
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v?\d+\.\d+\.\d+$/
+  script:
+    - >
+      skopeo copy --all
+      --src-creds "$CI_REGISTRY_USER:$CI_REGISTRY_PASSWORD"
+      --dest-creds "$HARBOR_USER:$HARBOR_PASSWORD"
+      "docker://$CANDIDATE" "docker://$HARBOR_IMAGE:$CI_COMMIT_TAG"
