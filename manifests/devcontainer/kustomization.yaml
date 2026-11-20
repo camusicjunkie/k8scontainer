@@ -1,10 +1,10 @@
+# What Flux applies from this directory: the Namespace, the Site Config, the
+# Roster and the ResourceSet that turns the Roster into every admin's Pod,
+# volume, key list, Service and Gateway route. No per-admin manifest lives here.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - namespace.yaml
   - site-config.yaml
-  - service.yaml
-  - authorized-keys.yaml
-  - gateway.yaml
-  - route.yaml
-  - statefulset.yaml
+  - roster.yaml
+  - resourceset.yaml

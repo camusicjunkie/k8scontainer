@@ -1,0 +1,26 @@
+# The Roster: the admins entitled to a Devcontainer Pod. Adding an entry and
+# merging provisions their Pod, volume, key list, Service and Gateway route;
+# removing one deprovisions them (the ResourceSet prunes what it generated).
+#
+# Per admin:
+#   name       DNS label, unique; names every generated object
+#   port       unique TCP port of this admin's listener on the shared Gateway
+#   publicKey  the smartcard PIV Authentication public key (RSA, public only)
+#   resources  optional overrides of the Pod's requests and limits
+#              (any of requests.cpu, requests.memory, limits.cpu, limits.memory)
+#
+# A Static ResourceSetInputProvider keeps the Roster a plain file: its
+# defaultValues are the single input set the ResourceSet renders from.
+apiVersion: fluxcd.controlplane.io/v1
+kind: ResourceSetInputProvider
+metadata:
+  name: roster
+  namespace: devcontainer
+spec:
+  type: Static
+  defaultValues:
+    admins:
+      - name: admin
+        port: 2201
+        # Placeholder key: its private half was discarded.
+        publicKey: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDGMtTCqmqSO9XPXGdcY52olfQRQgXDxrmRzY54cKx2VuUlOlWP9lioJl8D38axu2wQzYYzJcPNNZh3rr30ZrtM+NR2Chi9TSVble9f7UNMa4arBST6jJids84jpPHtIXpJEToegwqM+IWinsHWEubdNXVYfiWwNS6EYuLSwFo3+luDB0EVe79MvA/Lsm1fS/sDWB7DCQlJtka8L4pDj7m43YEz6R87wDjqOxskZeFGvpGCctmc995NmNt4fFpoV0eI15gY/FQ6vbd1oNzaeWtuB6ML1tZrn7gl3ZUKR0gIaLhBxMAlLOaXZswC69HOADYzAs4Ltak0VJqyohggY21h admin-piv-placeholder

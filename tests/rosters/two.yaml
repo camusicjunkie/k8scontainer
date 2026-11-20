@@ -1,0 +1,18 @@
+apiVersion: fluxcd.controlplane.io/v1
+kind: ResourceSetInputProvider
+metadata:
+  name: roster
+  namespace: devcontainer
+spec:
+  type: Static
+  defaultValues:
+    admins:
+      - name: alice
+        port: 2201
+        publicKey: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDGMtTCqmqSO9XPXGdcY52olfQRQgXDxrmRzY54cKx2VuUlOlWP9lioJl8D38axu2wQzYYzJcPNNZh3rr30ZrtM+NR2Chi9TSVble9f7UNMa4arBST6jJids84jpPHtIXpJEToegwqM+IWinsHWEubdNXVYfiWwNS6EYuLSwFo3+luDB0EVe79MvA/Lsm1fS/sDWB7DCQlJtka8L4pDj7m43YEz6R87wDjqOxskZeFGvpGCctmc995NmNt4fFpoV0eI15gY/FQ6vbd1oNzaeWtuB6ML1tZrn7gl3ZUKR0gIaLhBxMAlLOaXZswC69HOADYzAs4Ltak0VJqyohggY21h admin-piv-placeholder
+      - name: bob
+        port: 2202
+        publicKey: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCigzpgW7k678QQuOFlGK8naZW6mw0DG4b4FuNnp7lByi1WJbPnshcPhSfrrTsiFrmLOg7kfPGGvVwZC7R9CvqvaKVxHTdR3V2t2+FRQ6kjB6PJGFLIgYHp9a1eEpjgCV6V3L0fnGSgUIiOMq5KLEnUZPgBb1Xr7lppj79W86K6wIPb/Pnx8ZDeV1hGoz9abNK5fLXjrSZN7ALODBAOe8vD1iM5Gvd2NigaCdo1/aU730gV660ibRXmKYHONe9MqlWyRD9VqUv6Bso+SLJsu/kM5Zrk7Vjw1jHPSMSmemdhJyKKs1DHxAOrX4v3yHp8Am3UkYXsIzq9dFcJNS6TN5l9 bob-piv-placeholder
+        resources:
+          requests: { cpu: 500m, memory: 1Gi }
+          limits: { cpu: "4", memory: 8Gi }
