@@ -12,7 +12,9 @@
 #
 # Every ref builds and self-tests. The self-test runs the candidate with no
 # network (buildah run --network none), as tests/image.sh does locally, so it
-# proves the image works offline. Only a Release tag (vX.Y.Z or X.Y.Z)
+# proves the image works offline. It needs rootless isolation: under chroot
+# isolation buildah leaves the job's network in place (checked locally: TCP
+# still connects). Only a Release tag (vX.Y.Z or X.Y.Z)
 # publishes, and only the exact image that passed. Untested images never reach
 # Harbor, and an untagged push never publishes.
 #
@@ -76,7 +78,7 @@ selftest:
   image: quay.io/buildah/stable:v1.46.1
   variables:
     STORAGE_DRIVER: vfs
-    BUILDAH_ISOLATION: chroot
+    BUILDAH_ISOLATION: rootless
   script:
     - buildah login --username "$CI_REGISTRY_USER" --password "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
     - ctr=$(buildah from "docker://$CANDIDATE")

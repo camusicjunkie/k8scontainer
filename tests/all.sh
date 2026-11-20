@@ -35,7 +35,11 @@ else
     else
         for s in tests/image.sh tests/release.sh tests/secrets-klogin.sh; do skip "$s" "a running Docker"; done
     fi
-    if docker_up && has kubectl && has flux-operator; then
+    # tests/cluster.sh starts the image tests/image.sh just built; after a failed
+    # build it would test whatever stale devc-standard:test is left over.
+    if [[ " ${failed[*]} " == *" tests/image.sh "* ]]; then
+        skip tests/cluster.sh "the image tests/image.sh failed to build or pass"
+    elif docker_up && has kubectl && has flux-operator; then
         run tests/cluster.sh bash tests/cluster.sh
     else
         skip tests/cluster.sh "Docker, kubectl and the flux-operator CLI"

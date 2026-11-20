@@ -146,6 +146,10 @@ else:
     check("the self-test job runs devc-selftest", "devc-selftest" in selftest)
     check("the self-test runs with no network",
           re.search(r"--network[ =]none\b[^\n]*devc-selftest", selftest) is not None)
+    # chroot isolation keeps the job's network whatever --network says.
+    check("the self-test uses rootless isolation, which honours --network none",
+          cfg.get("selftest", {}).get("variables", {}).get("BUILDAH_ISOLATION") == "rootless"
+          and "--isolation chroot" not in selftest)
     build = "\n".join(cfg.get("build", {}).get("script", []))
     check("the build logs in to dhi.io for the base when DHI_USER is set",
           re.search(r"DHI_USER[\s\S]*--password-stdin dhi\.io", build) is not None)
