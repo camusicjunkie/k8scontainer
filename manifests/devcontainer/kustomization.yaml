@@ -7,4 +7,5 @@ resources:
   - namespace.yaml
   - site-config.yaml
   - roster.yaml
+  - image-automation.yaml
   - resourceset.yaml

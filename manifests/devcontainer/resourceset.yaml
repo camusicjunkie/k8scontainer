@@ -142,7 +142,10 @@ spec:
               type: RuntimeDefault
           containers:
             - name: devcontainer
-              image: harbor.example/devcontainer/standard:0.1.0
+              # One image for every admin, set in the Roster (the marked line
+              # the image automation rewrites). OnDelete means a new value
+              # reaches a Pod only when its admin restarts it.
+              image: << inputs.image >>
               imagePullPolicy: IfNotPresent
               ports:
                 - name: ssh

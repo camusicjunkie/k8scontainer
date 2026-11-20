@@ -71,6 +71,13 @@ done
 if grep -q 'alice' "$work/two-minus-alice.yaml" || ! grep -q 'alice' "$work/two.yaml"; then
     bad "removing alice from the Roster drops every object and listener generated for her"
 else ok "removing alice from the Roster drops every object and listener generated for her"; fi
+
+# Image update flow: the marker and policy, and that a new tag (or a pinned
+# earlier one) changes only the Pod template image.
+if render "$repo/tests/rosters/one-older-tag.yaml" "$work/one-older-tag.yaml"; then
+    "$py" -I "$(native "$repo/tests/cluster_update.py")" "$(native "$repo/manifests/devcontainer/roster.yaml")" \
+        "$(native "$work/one-older-tag.yaml")" "$(native "$work/one.yaml")" || failed=1
+else bad "one-older-tag.yaml renders"; fi
 rendered=$work/one.yaml
 if ! docker image inspect "$image" >/dev/null 2>&1; then
     echo "skip image behaviour: $image not present locally"

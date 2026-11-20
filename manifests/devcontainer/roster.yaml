@@ -19,6 +19,10 @@ metadata:
 spec:
   type: Static
   defaultValues:
+    # The Standard Image every Pod runs. The marker comment is the setter the
+    # existing image automation rewrites to the newest Release tag chosen by
+    # ImagePolicy devcontainer/devcontainer-standard (image-automation.yaml).
+    image: harbor.example/devcontainer/standard:0.1.0 # {"$imagepolicy": "devcontainer:devcontainer-standard"}
     admins:
       - name: admin
         port: 2201
