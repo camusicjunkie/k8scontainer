@@ -41,7 +41,7 @@ else
         skip tests/cluster.sh "Docker, kubectl and the flux-operator CLI"
     fi
     if has pwsh && pwsh -NoProfile -c 'exit [int]!(Get-Module -ListAvailable Pester | ? { $_.Version.Major -ge 5 })' 2>/dev/null; then
-        run workstation/tests pwsh -NoProfile -c 'Invoke-Pester workstation/tests -CI'
+        run workstation/tests pwsh -NoProfile -c 'exit (Invoke-Pester workstation/tests -PassThru).FailedCount'
     else
         skip workstation/tests "pwsh with Pester 5"
     fi
