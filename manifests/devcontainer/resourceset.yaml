@@ -24,9 +24,12 @@ spec:
     - kind: ResourceSetInputProvider
       name: roster
   resourcesTemplate: |
+    <<- if inputs.admins >>
     ---
     # Shared Gateway: one IP, one TCP listener per admin. gatewayClassName
-    # istio: the Management Cluster's Istio provisions the LoadBalancer.
+    # istio: the Management Cluster's Istio provisions the LoadBalancer. Not
+    # rendered for an empty Roster: a Gateway needs at least one listener, and
+    # an invalid object would stop the ResourceSet pruning the last admin.
     apiVersion: gateway.networking.k8s.io/v1
     kind: Gateway
     metadata:
@@ -44,6 +47,7 @@ spec:
               - kind: TCPRoute
             namespaces:
               from: Same
+    <<- end >>
     <<- end >>
     <<- range $a := inputs.admins >>
     ---

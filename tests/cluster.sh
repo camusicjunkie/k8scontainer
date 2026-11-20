@@ -42,13 +42,16 @@ import sys, yaml
 docs = [d for d in yaml.safe_load_all(sys.stdin) if d and d["kind"] not in ("ResourceSet", "ResourceSetInputProvider")]
 sys.stdout.write(yaml.safe_dump_all(docs))' >"$2" || { cat "$work/err"; return 1; }
     echo --- >>"$2"
+    # The CLI fails on an empty result; for an empty Roster that is the answer.
     flux-operator build resourceset -f "$(native "$repo/manifests/devcontainer/resourceset.yaml")" \
-        --inputs-from-provider "$(native "$1")" >>"$2" 2>"$work/err" || { cat "$work/err"; return 1; }
+        --inputs-from-provider "$(native "$1")" >>"$2" 2>"$work/err" \
+        || grep -q 'no objects were generated' "$work/err" || { cat "$work/err"; return 1; }
 }
 
 # The committed Roster is a sample too.
 for roster in "$repo/tests/rosters/one.yaml" "$repo/tests/rosters/two.yaml" \
-              "$repo/tests/rosters/two-minus-alice.yaml" "$repo/manifests/devcontainer/roster.yaml"; do
+              "$repo/tests/rosters/two-minus-alice.yaml" "$repo/tests/rosters/none.yaml" \
+              "$repo/manifests/devcontainer/roster.yaml"; do
     label=${roster#"$repo/"}
     out=$work/$(basename "$roster")
     echo "== $label"

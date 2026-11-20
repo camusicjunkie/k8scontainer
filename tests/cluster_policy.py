@@ -58,12 +58,16 @@ sts_all = of("StatefulSet")
 check("one StatefulSet per Roster entry and no others", sorted(s["metadata"]["name"] for s in sts_all) == sorted(f"devc-{n}" for n in names))
 
 gw = (of("Gateway") or [None])[0]
-check("renders exactly one shared Gateway", gw is not None and len(of("Gateway")) == 1)
-lis = [l for l in (gw or {}).get("spec", {}).get("listeners", []) if l.get("protocol") == "TCP"]
-check("the Gateway has exactly one TCP listener per Roster entry, on the Roster's ports",
-      sorted(l["port"] for l in lis) == sorted(ports) and len(lis) == len(gw["spec"]["listeners"]))
-check("every Gateway listener admits only Routes from its own namespace",
-      bool(lis) and all(l.get("allowedRoutes", {}).get("namespaces", {}).get("from") == "Same" for l in lis))
+lis = [l for l in (gw or {}).get("spec", {}).get("listeners") or [] if l.get("protocol") == "TCP"]
+if roster:
+    check("renders exactly one shared Gateway", gw is not None and len(of("Gateway")) == 1)
+    check("the Gateway has exactly one TCP listener per Roster entry, on the Roster's ports",
+          sorted(l["port"] for l in lis) == sorted(ports) and len(lis) == len(gw["spec"]["listeners"]))
+    check("every Gateway listener admits only Routes from its own namespace",
+          bool(lis) and all(l.get("allowedRoutes", {}).get("namespaces", {}).get("from") == "Same" for l in lis))
+else:
+    # A Gateway needs a listener; an invalid one would block pruning the last admin.
+    check("an empty Roster renders no Gateway", gw is None)
 check("one TCPRoute per Roster entry and no others", len(of("TCPRoute")) == len(roster))
 
 per_admin = {}
