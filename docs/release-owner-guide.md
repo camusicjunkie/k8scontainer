@@ -14,7 +14,7 @@ For the Release Owner (and the named backup). Terms are those of `GLOSSARY.md`. 
 
 **Protect the Release tag pattern** (`v*` and `[0-9]*`, matching `vX.Y.Z` and `X.Y.Z`) so only you can create it. Pushing a Release tag is the gate: nothing reaches a Registry until you do.
 
-**Runner needs** (from `.gitlab-ci.yml`): the job container must be allowed user namespaces (seccomp must not block `unshare`) and be given a `/dev/fuse` device, because buildah overlays the build context for `RUN --mount=type=bind`. It needs neither `--privileged` nor a Docker daemon. On a GitLab docker-executor runner that is `devices = ["/dev/fuse"]` and `security_opt = ["seccomp=unconfined", "apparmor=unconfined"]` under `[runners.docker]`; with Docker's default seccomp profile buildah fails with `unshare(CLONE_NEWUSER): Operation not permitted`.
+**Runner needs** (from `.gitlab-ci.yml`): the job container must be allowed user namespaces (seccomp must not block `unshare`) and be given a `/dev/fuse` device, because buildah overlays the build context for `RUN --mount=type=bind`. It needs neither `--privileged` nor a Docker daemon. On a GitLab docker-executor runner that is `devices = ["/dev/fuse"]` and `security_opt = ["seccomp=unconfined", "apparmor=unconfined"]` under `[runners.docker]`; under Docker's default seccomp rules buildah fails with `unshare(CLONE_NEWUSER): Operation not permitted`.
 
 **`candidate` images accumulate.** Every pipeline pushes `candidate:<commit sha>` to the project's Container Registry. Add a registry cleanup policy for that repository or it grows without bound.
 
