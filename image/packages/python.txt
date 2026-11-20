@@ -1,0 +1,18 @@
+# The one Python venv (/opt/venv), as pip requirements with major-version
+# constraints (~=X.0 allows any X.y). The build takes the newest version inside
+# each constraint, records `pip freeze` in MANIFEST, and keeps a wheelhouse so
+# `pip install --no-index` works offline.
+#
+# ansible-core rather than the ansible bundle: the collections come from
+# ansible-collections.yml, at their own constraints.
+ansible-core~=2.21
+ansible-lint~=26.0
+molecule~=26.0
+pyvmomi~=9.0
+vmware-vcenter~=9.0
+kubernetes~=37.0
+hvac~=2.0
+netaddr~=1.0
+jmespath~=1.0
+jsonschema~=4.0
+pywinrm~=0.5

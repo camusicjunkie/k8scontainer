@@ -1,0 +1,51 @@
+# apt packages for the Standard Image, one per line: DHI's hardened repo first,
+# then Debian trixie. No third-party repos. Tools #7 puts in from apt, plus the
+# ones brew can't supply without its own libraries (shellcheck, skopeo).
+
+# Base
+bash-completion
+bind9-dnsutils
+ca-certificates
+curl
+file
+genisoimage
+git
+htop
+iproute2
+iputils-ping
+jq
+less
+nano
+netcat-openbsd
+openssh-client
+openssl
+procps
+qemu-utils
+sshpass
+traceroute
+tree
+unzip
+vim
+xorriso
+xz-utils
+zip
+
+# Shell
+bat
+fd-find
+fzf
+neovim
+ripgrep
+tmux
+zoxide
+
+# Supply chain and lint
+shellcheck
+skopeo
+
+# Runtimes: Python for the venv (python3-venv), ICU and Kerberos for pwsh
+libgssapi-krb5-2
+libicu76
+python3
+python3-venv
+

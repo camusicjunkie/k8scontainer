@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# devc-ca-refresh: builds the trust store from the public bundle plus Site
+# Config's ca/*.crt. Runs at container start, as the container user, with no
+# capabilities: the store lives in a writable dir and the system path
+# /etc/ssl/certs/ca-certificates.crt links to it.
+#
+# Each site file must be a regular PEM file holding only certificates. A file
+# holding a private key, a symlink or anything else is rejected and reported.
+# With no Site Config the store is the public bundle alone.
+set -uo pipefail
+
+site_ca=${DEVC_SITE_ROOT:-/etc/devcontainer/site}/ca
+trust=${DEVC_TRUST_DIR:-/var/lib/devc/trust}
+public=${DEVC_PUBLIC_BUNDLE:-/usr/local/share/devc/public-ca-certificates.crt}
+store=$trust/ca-certificates.crt
+report=$trust/report
+
+log() { echo "ca-refresh: $*" | tee -a "$report.part"; }
+
+# Why FILE can't be trusted, or nothing when it can.
+reject_reason() {
+    local f=$1
+    [[ -L $f ]] && { echo "it is a symlink"; return; }
+    [[ -f $f ]] || { echo "it is not a regular file"; return; }
+    grep -q 'PRIVATE KEY' "$f" && { echo "it holds a private key"; return; }
+    grep -q -- '-----BEGIN CERTIFICATE-----' "$f" || { echo "it holds no PEM certificate"; return; }
+    grep -- '-----BEGIN ' "$f" | grep -qv -- '-----BEGIN CERTIFICATE-----' &&
+        { echo "it holds something other than certificates"; return; }
+    openssl storeutl -noout -certs "$f" >/dev/null 2>&1 || { echo "openssl can't read it"; return; }
+}
+
+: >"$report.part" || exit 1
+cp "$public" "$store.part" || exit 1
+
+shopt -s nullglob
+for f in "$site_ca"/*.crt; do
+    name=${f##*/}
+    reason=$(reject_reason "$f")
+    if [[ -n $reason ]]; then
+        log "rejected $name: $reason"
+        continue
+    fi
+    { echo; echo "# Site Config: $name"; cat "$f"; } >>"$store.part"
+    log "added $name"
+done
+[[ -d $site_ca ]] || log "no Site Config CAs at $site_ca; using the public bundle only"
+
+chmod 0644 "$store.part" "$report.part"
+mv -f "$store.part" "$store" && mv -f "$report.part" "$report"

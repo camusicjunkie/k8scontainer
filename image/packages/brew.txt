@@ -1,0 +1,34 @@
+# brew formulae for the builder stage (ADR 0001), one per line; tap/formula for
+# tapped ones. Latest at build time; `brew list --versions` goes in MANIFEST.
+# Only binaries that are static or need nothing but glibc can come from here
+# (image/build/brew-check.sh); anything else fails the build.
+
+# Kubernetes
+kubernetes-cli
+helm
+kustomize
+fluxcd/tap/flux
+controlplaneio-fluxcd/tap/flux-operator
+controlplaneio-fluxcd/tap/flux-operator-mcp
+k9s
+kubectx
+kubeconform
+kubeseal
+istioctl
+yq
+
+# VMware and IaC
+govc
+hashicorp/tap/terraform
+hashicorp/tap/packer
+hashicorp/tap/vault
+
+# Supply chain, secrets and forge
+cosign
+sops
+age
+glab
+
+# Shell
+starship
+lazygit

@@ -1,0 +1,31 @@
+# Codex system config for the Standard Image (Codex's System layer; an admin's
+# ~/.codex/config.toml overrides it). Per-site values come from the codex
+# wrapper: it sets base_url from Site Config's AI_GATEWAY_URL and the model from
+# AI_GATEWAY_MODEL, and runs Codex under with-secrets -k AI_GATEWAY_KEY.
+
+model_provider = "ai-gateway"
+
+# Nothing phones home: no update checks, analytics or feedback.
+check_for_update_on_startup = false
+
+# Codex's own bwrap sandbox can't run under cap_drop: ALL and no-new-privileges.
+# The container is the trust boundary; approval prompts stay at Codex's default.
+sandbox_mode = "danger-full-access"
+
+[model_providers.ai-gateway]
+name = "AI gateway"
+base_url = "https://ai-gateway.invalid" # replaced by the codex wrapper
+wire_api = "responses"
+env_key = "AI_GATEWAY_KEY"
+
+[analytics]
+enabled = false
+
+[feedback]
+enabled = false
+
+# Commands Codex runs don't see secret-looking variables or the forwarded agent.
+# This prevents accidents; it is not a security boundary.
+[shell_environment_policy]
+ignore_default_excludes = false # keep the default KEY/SECRET/TOKEN excludes
+exclude = ["*PASSWORD*", "SSH_AUTH_SOCK"]
