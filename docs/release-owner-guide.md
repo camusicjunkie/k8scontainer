@@ -18,13 +18,13 @@ For the Release Owner (and the named backup). Terms are those of `GLOSSARY.md`. 
 
 **`candidate` images accumulate.** Every pipeline pushes `candidate:<commit sha>` to the project's Container Registry. Add a registry cleanup policy for that repository or it grows without bound.
 
-**Unverified:** the full image build under buildah on the real runner, the push of `candidate`, the skopeo copy to the real Harbor and its credentials. The build also needs Internet and Marketplace access (it fetches the VS Code server and extensions), which is why it runs only on the Connected Side. The pipeline has no login for the DHI base's registry (`dhi.io`); if the runner cannot pull the base anonymously, the build fails and needs a credential added.
+**Unverified:** the full image build under buildah on the real runner, the push of `candidate`, the skopeo copy to the real Harbor and its credentials. The build also needs Internet and Marketplace access (it fetches the VS Code server and extensions), which is why it runs only on the Connected Side. The DHI base's registry (`dhi.io`) usually needs a login: set `DHI_USER` and `DHI_PASSWORD` (masked) to a Docker account entitled to the base, and the build logs in before it pulls. Also unverified: that `buildah run --network none` under chroot isolation really cuts the self-test off from the network on the real runner.
 
 ## Before each Release
 
 - **Refresh the DHI base digest.** `image/Dockerfile` pins the base (`DHI_BASE`) by digest. Its apt repository keeps moving, so a stale digest can make package installs fail. Get the current digest, for example `docker buildx imagetools inspect dhi.io/debian-base:trixie-dev`, and update the `ARG DHI_BASE=` line. Do this every Release.
 - **Check the other pins.** The VS Code commit and its checksums are in `image/packages/vscode.env`, extensions in `image/packages/vscode-extensions.txt`; both move only with a Release, and the Workstation pack must match them (below).
-- **Optional local check** (Docker needed): `bash tests/image.sh` builds the image and runs the self-test with no network. The pipeline runs the same self-test, `devc-selftest`, as a gate.
+- **Optional local check** (Docker needed): `bash tests/image.sh` builds the image and runs the self-test with no network. The pipeline runs the same self-test, `devc-selftest`, with no network, as a gate.
 
 ## Cutting a Release
 

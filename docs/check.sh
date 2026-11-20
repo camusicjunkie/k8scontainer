@@ -62,7 +62,7 @@ grep -q 'DEVC_UNLOCK_KEY' image/rootfs/usr/local/lib/devc/secrets.bash || bad "D
 # Personal Config: the bashrc the image sources is on the path the Pod mounts.
 grep -q 'mountPath: /home/dev/.devc/personal' manifests/devcontainer/resourceset.yaml || bad "Pod does not mount Personal Config at ~/.devc/personal"
 grep -q '\$HOME/.devc/personal/bashrc' image/rootfs/etc/bash.bashrc.d/99-personal.sh || bad "99-personal.sh does not read ~/.devc/personal/bashrc"
-! grep -rq '/etc/devcontainer/personal' image manifests || bad "stale /etc/devcontainer/personal path"
+! grep -rq '/etc/devcontainer/personal' image manifests docs/*.md || bad "stale /etc/devcontainer/personal path"
 
 [[ -e $flag ]] && { fail=1; rm -f "$flag"; }
 ((fail)) && { echo "docs check FAILED"; exit 1; }

@@ -44,7 +44,7 @@ The Pod's `sshd` accepts only the public keys from the Roster and no passwords. 
 Personal Config is yours alone and never holds secrets. It lives on your volume at `~/.devc/personal`:
 
 - `personal.env`: `NAME=value` lines, loaded into every login shell (including `ssh host command`) after Site Config, so yours override the network's. It is where `DEVC_UNLOCK_KEY` and your default `klogin` targets (`KLOGIN_SERVER`, `KLOGIN_NAMESPACE`, `KLOGIN_CLUSTER`) go.
-- `bashrc`: meant to be your prompt and aliases. **Known gap:** the image sources it from `/etc/devcontainer/personal/bashrc`, but the Pod mounts your volume at `~/.devc/personal`, so as built it is not loaded. Until the image is fixed, `~/.devc/personal/bashrc` has no effect, and `~/.bashrc` is not on your volume so edits there are lost on restart. Checked in e2e section 6.
+- `bashrc`: your prompt and aliases, sourced by every interactive shell. Put them here, not in `~/.bashrc`: `~/.bashrc` is not on your volume, so edits there are lost on restart. Checked in e2e section 6.
 
 Site Config is different: it belongs to the network, is a read-only ConfigMap rendered by Flux, and you cannot change it. It supplies the network's certificate authorities and the Supervisor addresses `klogin` uses.
 

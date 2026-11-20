@@ -10,7 +10,9 @@
 # a /dev/fuse device, because buildah overlays the build context for RUN
 # --mount=type=bind. It does not need --privileged or access to a daemon.
 #
-# Every ref builds and self-tests. Only a Release tag (vX.Y.Z or X.Y.Z)
+# Every ref builds and self-tests. The self-test runs the candidate with no
+# network (buildah run --network none), as tests/image.sh does locally, so it
+# proves the image works offline. Only a Release tag (vX.Y.Z or X.Y.Z)
 # publishes, and only the exact image that passed. Untested images never reach
 # Harbor, and an untagged push never publishes.
 #
@@ -18,6 +20,9 @@
 #   HARBOR_IMAGE     e.g. harbor.example/devcontainer/standard (no tag)
 #   HARBOR_USER      Harbor robot account with push on that project
 #   HARBOR_PASSWORD  masked and protected
+#   DHI_USER         Docker account entitled to the DHI base on dhi.io
+#   DHI_PASSWORD     its access token, masked; if both are unset the build
+#                    pulls the base anonymously
 # Protect the Release tag pattern so only the Release Owner can create it. The
 # project's Container Registry holds a `candidate` image per commit.
 
@@ -42,6 +47,10 @@ build:
     BUILDAH_ISOLATION: chroot
   script:
     - export VERSION="${CI_COMMIT_TAG:-0.0.0-$CI_COMMIT_SHORT_SHA}"
+    - |
+      if [ -n "${DHI_USER:-}" ]; then
+        printf '%s' "$DHI_PASSWORD" | buildah login --username "$DHI_USER" --password-stdin dhi.io
+      fi
     - >
       buildah build
       --build-arg "DEVC_VERSION=$VERSION"
@@ -53,11 +62,14 @@ build:
 selftest:
   stage: test
   needs: [build]
-  image:
-    name: $CANDIDATE
-    entrypoint: [""]
+  image: quay.io/buildah/stable:v1.46.1
+  variables:
+    STORAGE_DRIVER: vfs
+    BUILDAH_ISOLATION: chroot
   script:
-    - devc-selftest
+    - buildah login --username "$CI_REGISTRY_USER" --password "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - ctr=$(buildah from "docker://$CANDIDATE")
+    - buildah run --network none "$ctr" -- devc-selftest
 
 publish:
   stage: publish

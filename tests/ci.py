@@ -142,7 +142,15 @@ else:
         isinstance(j, dict) and "services" in j for j in cfg.values()) and "services" not in cfg)
     check("no privileged mode or docker daemon use",
           not re.search(r"privileged|docker\s+(build|run|push|login)|/var/run/docker\.sock", text))
-    check("the self-test job runs devc-selftest", "devc-selftest" in "\n".join(cfg.get("selftest", {}).get("script", [])))
+    selftest = "\n".join(cfg.get("selftest", {}).get("script", []))
+    check("the self-test job runs devc-selftest", "devc-selftest" in selftest)
+    check("the self-test runs with no network",
+          re.search(r"--network[ =]none\b[^\n]*devc-selftest", selftest) is not None)
+    build = "\n".join(cfg.get("build", {}).get("script", []))
+    check("the build logs in to dhi.io for the base when DHI_USER is set",
+          re.search(r"DHI_USER[\s\S]*--password-stdin dhi\.io", build) is not None)
+    check("DHI credentials appear only in the build job", all(
+        "DHI_" not in yaml.dump(j) for n, j in cfg.items() if isinstance(j, dict) and n != "build"))
     check("publish waits on the self-test", "selftest" in [
         n if isinstance(n, str) else n.get("job") for n in cfg.get("publish", {}).get("needs", [])])
     check("Harbor credentials appear only in the publish job", all(
