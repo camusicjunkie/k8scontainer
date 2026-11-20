@@ -31,9 +31,12 @@ if ! kubectl kustomize "$(native "$repo/manifests/devcontainer")" >"$rendered" 2
 fi
 ok "kustomize renders manifests/devcontainer"
 
+# Gateway API kinds come from the CRDs catalog (also fetched over the network).
 if docker run --rm -i ghcr.io/yannh/kubeconform:latest-alpine -strict -summary \
-        -kubernetes-version "$kube_version" - <"$rendered"; then
-    ok "kubeconform: manifests match the Kubernetes $kube_version schemas"
+        -kubernetes-version "$kube_version" -schema-location default \
+        -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+        - <"$rendered"; then
+    ok "kubeconform: manifests match the Kubernetes $kube_version and Gateway API schemas"
 else
     bad "kubeconform"
 fi
@@ -87,5 +90,50 @@ if pod bash -c 'want=$(openssl x509 -in /etc/devcontainer/site/ca/site-ca.crt -n
     openssl crl2pkcs7 -nocrl -certfile /etc/ssl/certs/ca-certificates.crt | openssl pkcs7 -print_certs -noout | grep -qF "${want#subject=}"' >/dev/null 2>&1; then
     ok "Site Config certificate authorities are trusted in the Pod"
 else bad "Site Config certificate authorities are trusted in the Pod"; fi
+
+# Reaching the Pod over sshd (the Gateway forwards plain TCP to port 2222, so
+# a client on the Pod's network namespace stands in for the Workstation). The
+# key list is mounted the way the Pod mounts it, holding the test's own RSA key
+# (like a PIV card's) in place of the placeholder, whose private half is gone.
+mkdir "$work/ssh"
+docker run --rm --user 1000:1000 -v "$(native "$work/ssh"):/k" --entrypoint ssh-keygen "$image" \
+    -q -t rsa -b 2048 -N '' -C test-smartcard -f /k/id_rsa >/dev/null 2>&1
+cp "$work/ssh/id_rsa.pub" "$work/ssh/authorized_keys"
+sshpod=devc-cluster-ssh-$$
+trap 'rm -rf "$work"; docker rm -f "$sshpod" >/dev/null 2>&1; docker volume rm "$vol" >/dev/null 2>&1' EXIT
+sshopts=(-p 2222 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=no
+         -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR)
+client() {  # ssh as the Workstation would, from the Pod's network namespace
+    docker run --rm --user 1000:1000 --network "container:$sshpod" -v "$(native "$work/ssh"):/k:ro" \
+        --entrypoint ssh "$image" -i "${keyfile:-/k/id_rsa}" "${sshopts[@]}" dev@127.0.0.1 "$@"
+}
+start_sshd() {
+    docker rm -f "$sshpod" >/dev/null 2>&1
+    docker run -d --name "$sshpod" --user 1000:1000 --cap-drop ALL --security-opt no-new-privileges \
+        "${mounts[@]}" -v "$(native "$work/ssh/authorized_keys"):/etc/devc/authorized_keys:ro" \
+        --entrypoint devc-entrypoint "$image" devc-sshd >/dev/null
+    for _ in $(seq 30); do client true >/dev/null 2>&1 && return 0; sleep 1; done
+    return 1
+}
+hostkey() {
+    docker run --rm --user 1000:1000 --network "container:$sshpod" --entrypoint sh "$image" -c \
+        'ssh-keyscan -p 2222 127.0.0.1 2>/dev/null | ssh-keygen -lf - | cut -d" " -f2'
+}
+if start_sshd; then
+    ok "the Pod's sshd starts under the Pod's security context with the mounted key list"
+    if [[ $(client 'echo hello' 2>/dev/null) == hello ]]; then ok "an RSA smartcard-style key logs in and opens a shell"
+    else bad "an RSA smartcard-style key logs in and opens a shell"; fi
+    docker run --rm --user 1000:1000 --network "container:$sshpod" --entrypoint sh "$image" -c \
+        'ssh-keygen -q -t rsa -b 2048 -N "" -f /tmp/other && ssh -i /tmp/other -p 2222 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null dev@127.0.0.1 true' >/dev/null 2>&1 \
+        && bad "a key not on the list is refused" || ok "a key not on the list is refused"
+    before=$(hostkey)
+    start_sshd
+    after=$(hostkey)
+    if [[ -n $before && $before == "$after" ]]; then ok "the host key is the same after a Pod restart ($before)"
+    else bad "the host key is the same after a Pod restart (before=$before after=$after)"; fi
+else
+    bad "the Pod's sshd starts under the Pod's security context with the mounted key list"
+    docker logs "$sshpod" 2>&1 | tail -5
+fi
 
 exit $failed

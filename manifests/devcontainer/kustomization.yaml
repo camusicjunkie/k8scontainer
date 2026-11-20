@@ -4,4 +4,7 @@ resources:
   - namespace.yaml
   - site-config.yaml
   - service.yaml
+  - authorized-keys.yaml
+  - gateway.yaml
+  - route.yaml
   - statefulset.yaml

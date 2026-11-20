@@ -1,0 +1,11 @@
+# The admin's key list (the Roster generates this later). The key below is a
+# placeholder for the smartcard PIV Authentication public key (RSA, as PIV
+# cards hold); its private half was discarded. Public keys only.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: admin-authorized-keys
+  namespace: devcontainer
+data:
+  authorized_keys: |
+    ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDGMtTCqmqSO9XPXGdcY52olfQRQgXDxrmRzY54cKx2VuUlOlWP9lioJl8D38axu2wQzYYzJcPNNZh3rr30ZrtM+NR2Chi9TSVble9f7UNMa4arBST6jJids84jpPHtIXpJEToegwqM+IWinsHWEubdNXVYfiWwNS6EYuLSwFo3+luDB0EVe79MvA/Lsm1fS/sDWB7DCQlJtka8L4pDj7m43YEz6R87wDjqOxskZeFGvpGCctmc995NmNt4fFpoV0eI15gY/FQ6vbd1oNzaeWtuB6ML1tZrn7gl3ZUKR0gIaLhBxMAlLOaXZswC69HOADYzAs4Ltak0VJqyohggY21h admin-piv-placeholder

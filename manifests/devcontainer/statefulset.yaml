@@ -58,11 +58,15 @@ spec:
             - { name: state, mountPath: /home/dev/.devc/personal, subPath: .devc/personal }
             - { name: state, mountPath: /var/lib/devc/hostkeys, subPath: hostkeys }
             - { name: state, mountPath: /home/dev/.local, subPath: .local }
+            - { name: authorized-keys, mountPath: /etc/devc/authorized_keys, subPath: authorized_keys, readOnly: true }
             # Single-file (subPath) mounts: the image's CA refresh rejects
             # symlinks, which a whole ConfigMap directory is made of.
             - { name: site-config, mountPath: /etc/devcontainer/site/site.env, subPath: site.env, readOnly: true }
             - { name: site-config, mountPath: /etc/devcontainer/site/ca/site-ca.crt, subPath: site-ca.crt, readOnly: true }
       volumes:
+        - name: authorized-keys
+          configMap:
+            name: admin-authorized-keys
         - name: site-config
           configMap:
             name: site-config

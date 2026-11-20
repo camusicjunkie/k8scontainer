@@ -1,5 +1,5 @@
 # Headless Service the StatefulSet requires (serviceName). Gateway exposure
-# comes with the Roster work, not here.
+# goes through the admin-ssh Service below.
 apiVersion: v1
 kind: Service
 metadata:
@@ -7,6 +7,21 @@ metadata:
   namespace: devcontainer
 spec:
   clusterIP: None
+  selector:
+    app.kubernetes.io/name: devcontainer
+    devcontainer/admin: admin
+  ports:
+    - name: ssh
+      port: 2222
+      targetPort: ssh
+---
+# What the Gateway's TCPRoute targets: a ClusterIP Service in front of the Pod.
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin-ssh
+  namespace: devcontainer
+spec:
   selector:
     app.kubernetes.io/name: devcontainer
     devcontainer/admin: admin
