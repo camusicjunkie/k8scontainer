@@ -4,9 +4,9 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The Release Owner can produce the archive, checksum and Review Packet from a tagged image
-- [ ] The import into the Disconnected Harbor checks the checksum first and refuses a mismatch
-- [ ] The imported image has the same digest as the one built on the Connected Side
-- [ ] The import refuses to overwrite an existing version
+- [x] The Release Owner can produce the archive, checksum and Review Packet from a tagged image
+- [x] The import into the Disconnected Harbor checks the checksum first and refuses a mismatch
+- [x] The imported image has the same digest as the one built on the Connected Side
+- [x] The import refuses to overwrite an existing version
