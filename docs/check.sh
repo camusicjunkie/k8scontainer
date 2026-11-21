@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Mechanical checks on docs/*.md: (1) no GLOSSARY.md _Avoid_ term in prose,
+# Mechanical checks on README.md and docs/*.md: (1) no GLOSSARY.md _Avoid_ term in prose,
 # (2) every repo path cited in backticks exists, (3) every script/command named
 # in backticks that this repo ships exists. Run from anywhere: docs/check.sh
 set -uo pipefail
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$repo" || exit 1
-docs=(docs/admin-guide.md docs/release-owner-guide.md docs/e2e-checklist.md)
+docs=(README.md docs/admin-guide.md docs/release-owner-guide.md docs/e2e-checklist.md)
 fail=0
 flag=$(mktemp -u)
 bad() { echo "FAIL $*"; fail=1; }
