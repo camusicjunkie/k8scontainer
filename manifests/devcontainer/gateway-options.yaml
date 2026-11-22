@@ -1,0 +1,17 @@
+# Customizes the gateway Deployment Istio generates for the shared Gateway
+# (resourceset.yaml points at it with infrastructure.parametersRef). Istio's
+# default proxy sets no seccomp profile, which Pod Security `restricted` in
+# the Devcontainer Namespace refuses; everything else it sets already passes.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: devcontainer-gateway
+  namespace: devcontainer
+data:
+  deployment: |
+    spec:
+      template:
+        spec:
+          securityContext:
+            seccompProfile:
+              type: RuntimeDefault

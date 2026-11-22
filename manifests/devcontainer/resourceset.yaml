@@ -37,6 +37,13 @@ spec:
       namespace: devcontainer
     spec:
       gatewayClassName: istio
+      # Istio merges this ConfigMap into the gateway Deployment it generates
+      # (gateway-options.yaml), so the gateway Pod passes Pod Security.
+      infrastructure:
+        parametersRef:
+          group: ""
+          kind: ConfigMap
+          name: devcontainer-gateway
       listeners:
     <<- range $a := inputs.admins >>
         - name: ssh-<< $a.name >>

@@ -8,4 +8,5 @@ resources:
   - site-config.yaml
   - roster.yaml
   - image-automation.yaml
+  - gateway-options.yaml
   - resourceset.yaml
