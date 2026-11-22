@@ -13,9 +13,13 @@
 # `range` back to ">=0.1.0" resumes following new Releases. Editing the Roster's
 # image alone does not stick, the automation would move it forward again.
 #
-# If the registry needs a pull credential, add spec.secretRef to the
-# ImageRepository (a dockerconfigjson Secret in this namespace, supplied
-# outside Git).
+# Per site, the Kustomization that syncs this directory patches the
+# ImageRepository (tests/kind/flux.yaml does the same for kind): spec.image to
+# the site's Registry; spec.certSecretRef when the Registry's CA is private
+# (a Secret with ca.crt in this namespace: the scanner runs in a Pod and does
+# not trust what the nodes trust); spec.secretRef when it needs a pull
+# credential (a dockerconfigjson Secret in this namespace). Secrets come from
+# outside Git.
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
 metadata:
