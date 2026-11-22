@@ -94,9 +94,8 @@ spec:
           port: 2222
           targetPort: ssh
     ---
-    # TCPRoute is v1alpha2 (experimental channel), the version Istio's Gateway
-    # API controller serves.
-    apiVersion: gateway.networking.k8s.io/v1alpha2
+    # TCPRoute is GA (v1, standard channel) since Gateway API v1.6.0.
+    apiVersion: gateway.networking.k8s.io/v1
     kind: TCPRoute
     metadata:
       name: devc-<< $a.name >>-ssh
@@ -193,7 +192,10 @@ spec:
             name: state
           spec:
             accessModes: ["ReadWriteOnce"]
-            storageClassName: standard
+            # The Roster's storageClass, or none: the cluster's default class.
+            <<- with get inputs "storageClass" >>
+            storageClassName: << . >>
+            <<- end >>
             resources:
               requests:
                 storage: 20Gi

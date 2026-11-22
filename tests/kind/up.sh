@@ -10,7 +10,7 @@
 # - Kyverno with the Gitops repository's own policies (GITOPS_DIR), with
 #   HARBOR_REGISTRY/HARBOR_PROJECT pointing at REGISTRY so its image rewrite
 #   lands on a registry the node can pull from,
-# - the Gateway API CRDs (experimental channel, for TCPRoute).
+# - the Gateway API CRDs (standard channel; TCPRoute is in it since v1.6.0).
 # Istio is not installed: the Gateway stays unprogrammed and SSH is reached
 # by port-forward.
 #
@@ -63,7 +63,7 @@ EOF
 k() { kubectl --context "$ctx" "$@"; }
 
 echo "== Gateway API CRDs"
-k apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.7.0/experimental-install.yaml >/dev/null
+k apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.7.0/standard-install.yaml >/dev/null
 
 echo "== Flux"
 k apply --server-side -f https://github.com/controlplaneio-fluxcd/flux-operator/releases/download/v0.63.0/install.yaml >/dev/null

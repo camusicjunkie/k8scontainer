@@ -9,6 +9,9 @@
 #   resources  optional overrides of the Pod's requests and limits
 #              (any of requests.cpu, requests.memory, limits.cpu, limits.memory)
 #
+# storageClass (optional, beside image) names the StorageClass of every admin's
+# volume; without it each claim takes the cluster's default class.
+#
 # A Static ResourceSetInputProvider keeps the Roster a plain file: its
 # defaultValues are the single input set the ResourceSet renders from.
 apiVersion: fluxcd.controlplane.io/v1

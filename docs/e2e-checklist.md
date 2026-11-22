@@ -6,7 +6,7 @@ Record the date, the Release version, who ran it, the result of every step and a
 
 ## Setup
 
-- **Management Cluster** on the Disconnected Side with Flux (including the image controllers and an ImageUpdateAutomation for this repository in the `devcontainer` namespace, pushing to `image-updates` with its own write credential; see the Release Owner guide), Kyverno, Istio ambient and Gateway API CRDs.
+- **Management Cluster** on the Disconnected Side with Flux (including the image controllers and an ImageUpdateAutomation for this repository in the `devcontainer` namespace, pushing to `image-updates` with its own write credential; see the Release Owner guide), Kyverno, Istio (a gateway only; no mesh is needed) and the Gateway API CRDs, standard channel v1.6.0 or later.
 - **Two test admins** on the Roster, with real smartcards, different ports. Call them A and B.
 - **A Workstation** with the Windows OpenSSH agent holding the card's keys, and the Release's Workstation pack.
 - **Two Releases** already imported (the one under test and the one before it), for sections 7 and 9. Have kubectl access to the Management Cluster for the checks that say so.
@@ -25,9 +25,8 @@ Record the date, the Release version, who ran it, the result of every step and a
 - [ ] **[unverified]** The Flux Operator reports the ResourceSet `devcontainer` Ready, and the inventory holds, per admin, a StatefulSet, a key list, two Services and a TCPRoute, plus one Gateway.
 - [ ] **[unverified]** The Devcontainer Namespace enforces Pod Security `restricted` (label `pod-security.kubernetes.io/enforce=restricted`) and the Pods start under it: `kubectl -n devcontainer get pods` shows `devc-<name>-0` Running with no admission warnings.
 - [ ] **[unverified]** The existing Kyverno policies admit the Pods and the other generated objects (no policy violation reports for the namespace). The image rewrite policy must use `request.namespace`: with `request.object.metadata.namespace`, Kyverno's autogen rejects the StatefulSet (seen on kind).
-- [ ] **[unverified]** The Istio ambient label is on the namespace and the Pods are enrolled in the mesh (check with the mesh's own tooling).
-- [ ] **[unverified]** The `standard` StorageClass binds each admin's claim `state-devc-<name>-0`.
-- [ ] **[unverified]** The cluster's Gateway API CRDs serve `TCPRoute` at `v1alpha2` (the version the ResourceSet renders). If not, record which version it serves.
+- [ ] **[unverified]** The Roster's `storageClass`, or the cluster's default class when it has none, binds each admin's claim `state-devc-<name>-0`.
+- [ ] **[unverified]** The cluster's Gateway API CRDs serve `TCPRoute` at `v1` (the version the ResourceSet renders). If not, record which version it serves.
 - [ ] **[unverified]** The Gateway is Programmed with one external IP, one listener per admin, and each TCPRoute is Accepted and has resolved refs.
 - [ ] The Pod has no Kubernetes API credentials: inside the Pod there is no ServiceAccount token under `/var/run/secrets/kubernetes.io`.
 - [ ] Adding a Roster entry for a third test admin by merge creates their Pod and listener without a manual step. Removing the entry prunes their Pod, Services, TCPRoute and listener, and leaves their PVC. Delete the PVC by hand afterwards.
@@ -40,7 +39,7 @@ Record the date, the Release version, who ran it, the result of every step and a
 - [ ] A's key logs in only to A's port: connecting A's card to B's port is refused.
 - [ ] A password login attempt is refused.
 - [ ] The Workstation needed no Kubernetes API access to do any of this.
-- [ ] **[unverified]** The ambient-mesh L4 path works for a long-lived session: leave the session idle for 10 minutes, then use it again, and run a port-forward (`ssh -L`) through it. Record any dropped connection.
+- [ ] **[unverified]** The gateway's TCP path holds a long-lived session (check its idle timeout): leave the session idle for 10 minutes, then use it again, and run a port-forward (`ssh -L`) through it. Record any dropped connection.
 - [ ] The Extensions view in the remote window lists the baked-in extensions, and `devc-selftest` passes in the Pod.
 
 ## 4. Host key stability

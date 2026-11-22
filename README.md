@@ -135,9 +135,9 @@ Flux applies [`manifests/devcontainer/`](manifests/devcontainer/kustomization.ya
 
 | File | Object | Role |
 |---|---|---|
-| `namespace.yaml` | Namespace `devcontainer` | the Devcontainer Namespace. Enforces Pod Security `restricted` and carries the Istio ambient label. |
+| `namespace.yaml` | Namespace `devcontainer` | the Devcontainer Namespace. Enforces Pod Security `restricted`. |
 | `site-config.yaml` | ConfigMap `site-config` | the network's Site Config: `site.env` (`KLOGIN_SERVERS`, `KLOGIN_NAMESPACES`, `KLOGIN_CLUSTERS`, and `AI_GATEWAY_URL` where the site has one) and `site-ca.crt`. A placeholder here; each network supplies its own values. |
-| `roster.yaml` | ResourceSetInputProvider `roster` (Static) | the Roster: the one `image:` line every Pod runs (marked for the image automation), and the `admins` list (`name`, `port`, `publicKey`, optional `resources`). |
+| `roster.yaml` | ResourceSetInputProvider `roster` (Static) | the Roster: the one `image:` line every Pod runs (marked for the image automation), an optional `storageClass` for every volume (left out, the cluster's default class), and the `admins` list (`name`, `port`, `publicKey`, optional `resources`). |
 | `image-automation.yaml` | ImageRepository and ImagePolicy `devcontainer-standard` | scan the Registry every 5 minutes and pick the newest Release tag (`semver ">=0.1.0"`, never a pre-release). |
 | `resourceset.yaml` | ResourceSet `devcontainer` | renders everything below from the Roster. |
 
@@ -155,7 +155,7 @@ per admin:
   ConfigMap devc-<name>-authorized-keys   the admin's smartcard public key
   StatefulSet devc-<name>           1 replica, updateStrategy OnDelete
   └── Pod devc-<name>-0             the Devcontainer Pod (image = Roster's image)
-      └── PVC state-devc-<name>-0   20Gi, StorageClass standard: the State Directory
+      └── PVC state-devc-<name>-0   20Gi, the Roster's storageClass or the cluster default: the State Directory
 ```
 
 The Pod runs as UID 1000 with all capabilities dropped, no privilege escalation, the `RuntimeDefault` seccomp setting and no ServiceAccount token. It has no Kubernetes API credentials.
@@ -174,7 +174,7 @@ The automation must live in `devcontainer`, because an automation only applies I
 Two things from the Gitops repository also apply to these Pods:
 
 - **Kyverno image rewrite:** any Pod image not already on `${HARBOR_REGISTRY}` is rewritten to `${HARBOR_REGISTRY}/${HARBOR_PROJECT}/<namespace>/<name:tag>`. Publish the Standard Image to that path (`HARBOR_IMAGE`) and point the ImageRepository and the Roster at it, and the rewrite leaves it alone. The policy must use `request.namespace` for StatefulSets to be admitted (camusicjunkie/Gitops#1).
-- **Istio ambient** programs the Gateway and carries the TCP traffic to the Pod.
+- **Istio** (`gatewayClassName: istio`) programs the Gateway: a gateway deployment behind one LoadBalancer IP that forwards each listener's TCP to its admin's Service. No mesh is needed; the Devcontainer Namespace does not join ambient or take sidecars. The cluster's Gateway API CRDs must serve `TCPRoute` `v1` (standard channel, v1.6.0 or later).
 
 ## 5. How an admin connects
 

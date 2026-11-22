@@ -16,7 +16,9 @@ import sys
 
 import yaml
 
-roster = yaml.safe_load(open(sys.argv[1]))["spec"]["defaultValues"]["admins"]
+inputs = yaml.safe_load(open(sys.argv[1]))["spec"]["defaultValues"]
+roster = inputs["admins"]
+storage_class = inputs.get("storageClass")  # absent: the claim names no class
 docs = [d for d in yaml.safe_load_all(sys.stdin) if d]
 failed = []
 
@@ -46,7 +48,6 @@ if ns is None:
     sys.exit(1)
 labels = ns["metadata"].get("labels", {})
 check("namespace enforces Pod Security restricted", labels.get("pod-security.kubernetes.io/enforce") == "restricted")
-check("namespace joins Istio ambient", labels.get("istio.io/dataplane-mode") == "ambient")
 check("every namespaced object is in the Devcontainer Namespace",
       all(d["metadata"].get("namespace") == ns["metadata"]["name"] for d in docs if d["kind"] != "Namespace"))
 check("nothing from the Roster machinery itself is rendered as a workload", not of("ResourceSet"))
@@ -111,8 +112,8 @@ for a in roster:
 
     # Volume layout
     claims = {t["metadata"]["name"]: t for t in spec.get("volumeClaimTemplates", [])}
-    check(f"[{n}] one State Directory claim, 20Gi on standard, ReadWriteOnce",
-          len(claims) == 1 and all(t["spec"]["storageClassName"] == "standard"
+    check(f"[{n}] one State Directory claim, 20Gi on {storage_class or 'the default class'}, ReadWriteOnce",
+          len(claims) == 1 and all(t["spec"].get("storageClassName") == storage_class
                                    and t["spec"]["resources"]["requests"]["storage"] == "20Gi"
                                    and t["spec"]["accessModes"] == ["ReadWriteOnce"] for t in claims.values()))
     state = next(iter(claims), None)
