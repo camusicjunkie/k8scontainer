@@ -15,6 +15,7 @@ iproute2
 iputils-ping
 jq
 less
+locales
 nano
 netcat-openbsd
 openssh-client

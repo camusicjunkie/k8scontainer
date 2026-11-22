@@ -122,6 +122,10 @@ RUN --mount=type=bind,source=packages,target=/mnt/packages \
 # the Workstation installer reads), checked against its SHA-256, and the
 # extensions in packages/vscode-extensions.txt installed with that server. This
 # is where Remote-SSH looks, so attaching downloads nothing. Build time only.
+# Remote-SSH has two layouts: the classic bin/<commit>, and the exec-server one
+# it defaults to now (the CLI at code-<commit>, which runs the server from
+# cli/servers/Stable-<commit>/server). Both are staged: the second links to the
+# first, so it costs no space.
 FROM ${DHI_BASE} AS vscode
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # hadolint ignore=DL3008
@@ -136,6 +140,14 @@ RUN --mount=type=bind,source=packages,target=/mnt/packages \
     && server=/home/dev/.vscode-server/bin/${VSCODE_COMMIT} \
     && install -d "$server" \
     && tar -xzf /tmp/server.tar.gz --strip-components 1 -C "$server" \
+    && curl -fsSL -o /tmp/cli.tar.gz \
+        "https://update.code.visualstudio.com/commit:${VSCODE_COMMIT}/cli-alpine-x64/stable" \
+    && echo "${VSCODE_CLI_SHA256}  /tmp/cli.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/cli.tar.gz -C /tmp \
+    && install -m 0755 /tmp/code "/home/dev/.vscode-server/code-${VSCODE_COMMIT}" \
+    && "/home/dev/.vscode-server/code-${VSCODE_COMMIT}" --version | grep -q "commit ${VSCODE_COMMIT}" \
+    && install -d "/home/dev/.vscode-server/cli/servers/Stable-${VSCODE_COMMIT}" \
+    && ln -s "../../../bin/${VSCODE_COMMIT}" "/home/dev/.vscode-server/cli/servers/Stable-${VSCODE_COMMIT}/server" \
     && args=() \
     && while read -r p; do args+=(--install-extension "$p"); done \
         < <(grep -vE '^[[:space:]]*(#|$)' /mnt/packages/vscode-extensions.txt) \
@@ -145,7 +157,7 @@ RUN --mount=type=bind,source=packages,target=/mnt/packages \
     && while read -r p; do \
         grep -qix "${p%@*} ${p##*@}" /extensions.txt || { echo "pinned $p did not install" >&2; exit 1; }; \
     done < <(grep -vE '^[[:space:]]*(#|$)' /mnt/packages/vscode-extensions.txt) \
-    && rm -rf /tmp/server.tar.gz
+    && rm -rf /tmp/server.tar.gz /tmp/cli.tar.gz /tmp/code
 
 # ------------------------------------------------------------------ final
 FROM ${DHI_BASE}
@@ -160,12 +172,17 @@ ARG PWSH_VERSION=7.6.6
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # apt packages from the flat list: DHI's hardened repo, then Debian trixie.
+# The base ships no /etc/ld.so.cache, and the VS Code CLI finds libstdc++ only
+# through `ldconfig -p`, so the cache is built here. en_US.UTF-8 is the locale
+# VS Code terminals set (terminal.integrated.detectLocale).
 # hadolint ignore=DL3008
 RUN --mount=type=bind,source=packages,target=/mnt/packages \
     apt-get update \
     && grep -vE '^[[:space:]]*(#|$)' /mnt/packages/apt.txt \
         | xargs apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
+    && localedef -i en_US -f UTF-8 en_US.UTF-8 \
+    && ldconfig \
     && install -d /usr/local/bin \
     && ln -s /usr/bin/fdfind /usr/local/bin/fd \
     && ln -s /usr/bin/batcat /usr/local/bin/bat

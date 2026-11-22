@@ -96,7 +96,34 @@ owned_by_user() {
     [[ -w $vscode_home && -w $vscode_home/extensions ]]
 }
 
+# Remote-SSH's exec-server layout: the CLI at code-<commit> runs the same server
+# from cli/servers/Stable-<commit>/server, so either layout finds it offline.
+exec_server_layout() {
+    local cli=$vscode_home/code-$vscode_commit
+    local alt=$vscode_home/cli/servers/Stable-$vscode_commit/server
+    [[ -x $cli ]] || { echo "no $cli"; return 1; }
+    "$cli" --version | grep -q "commit $vscode_commit" || { echo "$cli is not commit $vscode_commit"; return 1; }
+    [[ -x $alt/bin/code-server ]] || { echo "no $alt/bin/code-server"; return 1; }
+    [[ $("$alt/bin/code-server" --version | sed -n 2p) == "$vscode_commit" ]] || { echo "$alt is not commit $vscode_commit"; return 1; }
+}
+
+# The CLI's prerequisite check finds libstdc++ at /usr/lib64/libstdc++.so.6 or
+# through `ldconfig -p`; failing both, it refuses to start the server.
+cli_finds_libstdcxx() {
+    [[ -e /usr/lib64/libstdc++.so.6 ]] && return 0
+    /sbin/ldconfig -p | grep -q 'libstdc++\.so\.6 ' || { echo "ldconfig -p lists no libstdc++.so.6"; return 1; }
+}
+
+# VS Code terminals set LANG from the Workstation's display language.
+terminal_locale() {
+    locale -a | grep -qix 'en_US\.utf8' || { echo "en_US.UTF-8 missing; have: $(locale -a | tr '\n' ' ')"; return 1; }
+    [[ -z $(LANG=en_US.UTF-8 bash -c : 2>&1) ]] || { echo "bash warns under LANG=en_US.UTF-8"; return 1; }
+}
+
 check "the VS Code server is the pinned commit" server_is_pinned_commit
+check "the exec-server layout (code-<commit> and cli/servers/Stable-<commit>/server) is staged" exec_server_layout
+check "the VS Code CLI finds libstdc++ (its prerequisite check)" cli_finds_libstdcxx
+check "VS Code terminals' locale (en_US.UTF-8) exists" terminal_locale
 check "the baked extensions include every pinned one" extensions_match_pins
 check "the baked extensions match MANIFEST" extensions_match_manifest
 check "every extension is on disk" extensions_on_disk
