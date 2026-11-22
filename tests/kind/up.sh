@@ -45,6 +45,8 @@ done
 [[ -d $gitops/apps/kyverno/configs ]] || { echo "GITOPS_DIR has no apps/kyverno/configs: $gitops"; exit 1; }
 ! grep -rq 'request\.object\.metadata\.namespace' "$gitops/apps/kyverno/configs" \
     || { echo "GITOPS_DIR's image rewrite policy predates the request.namespace fix: $gitops"; exit 1; }
+grep -q 'gateway.networking.k8s.io/channel: experimental' "$gitops/apps/istio/controllers/gatewayapi/crds.yaml" \
+    || { echo "GITOPS_DIR vendors standard-channel Gateway API CRDs, which Istio cannot route TCP with: $gitops"; exit 1; }
 
 if ! kind get clusters 2>/dev/null | grep -qx "$name"; then
     kind create cluster --name "$name" --wait 120s --config - <<EOF
