@@ -6,7 +6,7 @@ Record the date, the Release version, who ran it, the result of every step and a
 
 ## Setup
 
-- **Management Cluster** on the Disconnected Side with Flux (including the image controllers and an ImageUpdateAutomation for this repository in the `devcontainer` namespace, pushing to `image-updates` with its own write credential; see the Release Owner guide), Kyverno, Istio (a gateway only; no mesh is needed) and the Gateway API CRDs, standard channel v1.6.0 or later.
+- **Management Cluster** on the Disconnected Side with Flux (including the image controllers and an ImageUpdateAutomation for this repository in the `devcontainer` namespace, pushing to `image-updates` with its own write credential; see the Release Owner guide), Kyverno, Istio (a gateway only; no mesh is needed) and the Gateway API CRDs, experimental channel v1.7.0, as the Gitops repository's `clusters/management/istio.yaml` installs them.
 - **Two test admins** on the Roster, with real smartcards, different ports. Call them A and B.
 - **A Workstation** with the Windows OpenSSH agent holding the card's keys, and the Release's Workstation pack.
 - **Two Releases** already imported (the one under test and the one before it), for sections 7 and 9. Have kubectl access to the Management Cluster for the checks that say so.
@@ -26,7 +26,7 @@ Record the date, the Release version, who ran it, the result of every step and a
 - [ ] **[unverified]** The Devcontainer Namespace enforces Pod Security `restricted` (label `pod-security.kubernetes.io/enforce=restricted`) and the Pods start under it: `kubectl -n devcontainer get pods` shows `devc-<name>-0` Running with no admission warnings.
 - [ ] **[unverified]** The existing Kyverno policies admit the Pods and the other generated objects (no policy violation reports for the namespace). The image rewrite policy must use `request.namespace`: with `request.object.metadata.namespace`, Kyverno's autogen rejects the StatefulSet (seen on kind).
 - [ ] **[unverified]** The Roster's `storageClass`, or the cluster's default class when it has none, binds each admin's claim `state-devc-<name>-0`.
-- [ ] **[unverified]** The cluster's Gateway API CRDs serve `TCPRoute` at `v1` (the version the ResourceSet renders). If not, record which version it serves.
+- [ ] **[unverified]** The cluster's Gateway API CRDs are the experimental channel and serve `TCPRoute` at both `v1` (what the ResourceSet renders) and `v1alpha2` (what Istio reads), and istiod has `PILOT_ENABLE_ALPHA_GATEWAY_API=true`. The gateway Pod `devcontainer-istio` runs in the Devcontainer Namespace under Pod Security `restricted`.
 - [ ] **[unverified]** The Gateway is Programmed with one external IP, one listener per admin, and each TCPRoute is Accepted and has resolved refs.
 - [ ] The Pod has no Kubernetes API credentials: inside the Pod there is no ServiceAccount token under `/var/run/secrets/kubernetes.io`.
 - [ ] Adding a Roster entry for a third test admin by merge creates their Pod and listener without a manual step. Removing the entry prunes their Pod, Services, TCPRoute and listener, and leaves their PVC. Delete the PVC by hand afterwards.

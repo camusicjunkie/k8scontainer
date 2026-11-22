@@ -174,7 +174,7 @@ The automation must live in `devcontainer`, because an automation only applies I
 Two things from the Gitops repository also apply to these Pods:
 
 - **Kyverno image rewrite:** any Pod image not already on `${HARBOR_REGISTRY}` is rewritten to `${HARBOR_REGISTRY}/${HARBOR_PROJECT}/<namespace>/<name:tag>`. Publish the Standard Image to that path (`HARBOR_IMAGE`) and point the ImageRepository and the Roster at it, and the rewrite leaves it alone. The policy must use `request.namespace` for StatefulSets to be admitted (camusicjunkie/Gitops#1).
-- **Istio** (`gatewayClassName: istio`) programs the Gateway: a gateway deployment behind one LoadBalancer IP that forwards each listener's TCP to its admin's Service. No mesh is needed; the Devcontainer Namespace does not join ambient or take sidecars. The cluster's Gateway API CRDs must serve `TCPRoute` `v1` (standard channel, v1.6.0 or later).
+- **Istio** (`gatewayClassName: istio`) programs the Gateway: a gateway deployment behind one LoadBalancer IP that forwards each listener's TCP to its admin's Service. No mesh is needed; the Devcontainer Namespace does not join ambient or take sidecars. Two Istio requirements, both met by the Gitops repository's `clusters/management/istio.yaml`: istiod runs with `PILOT_ENABLE_ALPHA_GATEWAY_API=true` (Istio 1.30 still gates TCP listeners behind it), and the Gateway API CRDs are the **experimental** channel, because Istio reads TCPRoute only at `v1alpha2`, which the standard channel no longer serves. The manifests use `v1`; the API server serves both. `gateway-options.yaml` sets the `seccompProfile` that Pod Security `restricted` requires on the gateway Deployment Istio generates.
 
 ## 5. How an admin connects
 
@@ -279,10 +279,10 @@ tests/all.sh --files   # the file checks only: what CI's `checks` job runs
 | `tests/secrets-klogin.sh` | runs the image the way the Pod does and drives `secrets`, `with-secrets` and `klogin` over SSH with a software agent standing in for the smartcard | Docker |
 | `tests/release.sh` | `cut.sh` then `import.sh` between two throwaway registries; digest preserved, overwrite and corruption refused | Docker |
 | `tests/cluster.sh` | renders the ResourceSet from sample Rosters (`tests/rosters/`), validates the schemas and Pod Security `restricted`, and the update flow (`tests/cluster_policy.py`, `tests/cluster_update.py`) | Docker, kubectl, flux-operator CLI |
-| `tests/cluster-live.sh` | on a real cluster under the Gitops repository's Kyverno policies: Pod admitted and answers SSH with the Roster's key, state survives restart, a new tag flows through the automation and push branch to the template but not the running Pod, and removing and re-adding an admin | the kind cluster from `tests/kind/up.sh` |
+| `tests/cluster-live.sh` | on a real cluster under the Gitops repository's Kyverno policies: Pod admitted and answers SSH with the Roster's key, directly and through the Istio gateway on the admin's port, state survives restart, a new tag flows through the automation and push branch to the template but not the running Pod, and removing and re-adding an admin | the kind cluster from `tests/kind/up.sh` |
 | `workstation/tests` | the installer's Pester tests | pwsh + Pester 5 |
 
-[`tests/kind/up.sh`](tests/kind/up.sh) builds that kind cluster: Flux (with the image controllers), Kyverno with the Gitops repository's own policies, and the Gateway API CRDs. With `GIT_URL` set, it also applies `tests/kind/flux.yaml`. Istio isn't installed, so the live seam reaches SSH by port-forward instead of through the Gateway.
+[`tests/kind/up.sh`](tests/kind/up.sh) builds that kind cluster: Flux (with the image controllers), Kyverno with the Gitops repository's own policies, the Gitops repository's Gateway API CRDs, and Istio gateway-only at the Gitops repository's version. With `GIT_URL` set, it also applies `tests/kind/flux.yaml`. kind has no LoadBalancer, so the live seam reaches the gateway's Service by port-forward.
 
 What no automated seam can reach (a real Gateway under Istio, real Harbor, a real smartcard, the real Management Cluster) is the manual [`docs/e2e-checklist.md`](docs/e2e-checklist.md). It gates every Release on the Disconnected Side.
 

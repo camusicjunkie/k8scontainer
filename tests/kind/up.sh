@@ -10,9 +10,13 @@
 # - Kyverno with the Gitops repository's own policies (GITOPS_DIR), with
 #   HARBOR_REGISTRY/HARBOR_PROJECT pointing at REGISTRY so its image rewrite
 #   lands on a registry the node can pull from,
-# - the Gateway API CRDs (standard channel; TCPRoute is in it since v1.6.0).
-# Istio is not installed: the Gateway stays unprogrammed and SSH is reached
-# by port-forward.
+# - the Gateway API CRDs the Gitops repository vendors (experimental channel:
+#   Istio reads TCPRoute only at v1alpha2, which standard no longer serves),
+# - Istio gateway-only, at the Gitops repository's istiod version, as its
+#   clusters/management/istio.yaml installs it: istio-base and istiod with no
+#   mesh and PILOT_ENABLE_ALPHA_GATEWAY_API, so the devcontainer Gateway is
+#   programmed. Its LoadBalancer stays pending; tests reach its Service by
+#   port-forward.
 #
 # REGISTRY is a plain-HTTP registry on DOCKER_NETWORK; the node joins that
 # network, so it can also reach a Git server there (the local GitLab).
@@ -62,8 +66,13 @@ server = "http://$registry"
 EOF
 k() { kubectl --context "$ctx" "$@"; }
 
-echo "== Gateway API CRDs"
-k apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.7.0/standard-install.yaml >/dev/null
+echo "== Gateway API CRDs ($gitops)"
+# A cluster first given the standard v1.7+ bundle has its safe-upgrades policy,
+# which refuses moving to experimental; the vendored bundle brings it back.
+if [[ $(k get crd gateways.gateway.networking.k8s.io -o jsonpath='{.metadata.annotations.gateway\.networking\.k8s\.io/channel}' 2>/dev/null) == standard ]]; then
+    k delete validatingadmissionpolicybinding,validatingadmissionpolicy safe-upgrades.gateway.networking.k8s.io --ignore-not-found >/dev/null
+fi
+k apply --server-side --force-conflicts -f "$gitops/apps/istio/controllers/gatewayapi/crds.yaml" >/dev/null
 
 echo "== Flux"
 k apply --server-side -f https://github.com/controlplaneio-fluxcd/flux-operator/releases/download/v0.63.0/install.yaml >/dev/null
@@ -114,6 +123,26 @@ k kustomize "$gitops/apps/kyverno/configs" \
     | envsubst '$KYVERNO_VALIDATION_ACTION $HARBOR_REGISTRY $HARBOR_PROJECT' \
     | diff - "${TMPDIR:-/tmp}/devc-kind-policies.yaml" | grep '^[<>]' || true
 k wait clusterpolicy --all --for=condition=Ready --timeout 120s
+
+istio=$(sed -n 's/^ *tag: "\([^"]*\)".*/\1/p' "$gitops/apps/istio/controllers/istiod/ocirepository.yaml")
+echo "== Istio $istio, gateway only"
+# The image rewrite sends istiod (istio-system) and the devcontainer gateway to
+# REGISTRY's per-namespace paths, so the images are mirrored there first, as
+# Harbor holds them on the Management Cluster.
+crane() { docker run --rm --network "$network" gcr.io/go-containerregistry/crane:v0.22.1 "$@" --insecure; }
+crane copy "registry.istio.io/release/pilot:$istio" "$registry/$harbor_project/istio-system/pilot:$istio" >/dev/null
+crane copy "registry.istio.io/release/proxyv2:$istio" "$registry/$harbor_project/devcontainer/proxyv2:$istio" >/dev/null
+charts=$(mktemp -d); chmod 777 "$charts"
+docker run --rm -v "$charts:/o" --entrypoint sh alpine/helm:3.16.4 -c "
+    helm repo add istio https://istio-release.storage.googleapis.com/charts >/dev/null &&
+    helm template istio-base istio/base --version $istio -n istio-system --include-crds --set defaultRevision=default >/o/base.yaml &&
+    helm template istiod istio/istiod --version $istio -n istio-system --set defaultRevision=default \
+        --set pilot.env.PILOT_ENABLE_ALPHA_GATEWAY_API=true >/o/istiod.yaml"
+k create namespace istio-system --dry-run=client -o yaml | k apply -f - >/dev/null
+k apply --server-side --force-conflicts -f "$charts/base.yaml" >/dev/null
+k apply --server-side --force-conflicts -f "$charts/istiod.yaml" >/dev/null
+rm -rf "$charts"
+k -n istio-system rollout status deploy/istiod --timeout 300s
 
 if [[ -n ${GIT_URL:-} ]]; then
     echo "== Flux sync from $GIT_URL ${GIT_BRANCH:?}"

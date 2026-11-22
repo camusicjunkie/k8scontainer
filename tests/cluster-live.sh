@@ -6,15 +6,16 @@
 #   tests/cluster-live.sh
 #
 # Checks, in order: the admin's Pod runs under Pod Security restricted and
-# answers SSH with the Roster's key; a restart keeps the State Directory and
+# answers SSH with the Roster's key, directly and through the Istio gateway on
+# the admin's Roster port; a restart keeps the State Directory and
 # host key and nothing else; a new Release tag reaches the StatefulSet through
 # the image automation but the Pod only on restart (OnDelete); removing the
 # admin from the Roster removes the Pod and keeps the volume, and adding them
 # back finds their state.
 #
 # Pushes a new tag to REGISTRY (through DOCKER_NETWORK), lets the automation
-# commit to its push branch, and fast-forwards the synced branch to it as
-# merging the update would. Needs kubectl, ssh and docker.
+# commit to its push branch, and merges that into the synced branch as merging
+# the update would. Needs kubectl, ssh and docker.
 set -uo pipefail
 ctx=${KUBE_CONTEXT:-kind-devc}
 state=${STATE_DIR:-$HOME/.cache/devc-kind}
@@ -69,11 +70,17 @@ sts_image() { k -n $ns get sts devc-admin -o jsonpath='{.spec.template.spec.cont
 pod_ready() { k -n $ns wait pod/devc-admin-0 --for=condition=Ready --timeout "${1:-600}s" >/dev/null 2>&1; }
 restart() { k -n $ns delete pod devc-admin-0 --wait=true >/dev/null; sleep 2; pod_ready; }
 
-# ssh to the admin's Pod as the Workstation would, through a port-forward to
-# the Service the TCPRoute targets (no Istio here to program the Gateway).
+# ssh to the admin's Pod through a port-forward to a Service: by default the
+# one the TCPRoute targets; with SSH_VIA=gateway, the Istio gateway's own
+# Service on the admin's Roster port, the path a Workstation takes (kind has no
+# LoadBalancer for the Gateway's address).
 pod_ssh() {
-    local port=$((20000 + RANDOM % 10000)) pf out rc
-    k -n $ns port-forward svc/devc-admin-ssh "$port:2222" >/dev/null 2>&1 & pf=$!
+    local port=$((20000 + RANDOM % 10000)) pf out rc svc=devc-admin-ssh target=2222
+    if [[ ${SSH_VIA:-} == gateway ]]; then
+        svc=devcontainer-istio
+        target=$(k -n $ns get gateway devcontainer -o jsonpath='{.spec.listeners[?(@.name=="ssh-admin")].port}')
+    fi
+    k -n $ns port-forward "svc/$svc" "$port:$target" >/dev/null 2>&1 & pf=$!
     for _ in $(seq 20); do (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null && break; sleep 0.5; done
     out=$(ssh -i "$state/id_rsa" -p "$port" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=no \
         -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR dev@127.0.0.1 "$@"); rc=$?
@@ -89,6 +96,10 @@ check "the namespace enforces Pod Security restricted" \
     "[[ \$(k get ns $ns -o jsonpath='{.metadata.labels.pod-security\.kubernetes\.io/enforce}') == restricted ]]"
 check "the Pod runs the image from $registry" "[[ \$(pod_image) == $registry/* ]]"
 check "the Roster's key opens a shell" "[[ \$(pod_ssh 'echo hello') == hello ]]"
+listener() { k -n $ns get gateway devcontainer -o jsonpath='{.status.listeners[?(@.name=="ssh-admin")].attachedRoutes}' 2>/dev/null; }
+check "Istio accepts the Gateway's ssh-admin listener with its TCPRoute attached" "until_true 180 '[[ \$(listener) == 1 ]]'"
+check "the gateway Pod runs under Pod Security restricted" "k -n $ns rollout status deploy/devcontainer-istio --timeout 180s >/dev/null"
+check "the Roster's key opens a shell through the gateway, on the admin's port" "[[ \$(SSH_VIA=gateway pod_ssh 'echo hello') == hello ]]"
 
 echo "== restart"
 pod_ssh 'echo kept >~/workspace/note; echo off >~/stray' >/dev/null
