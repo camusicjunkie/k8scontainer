@@ -60,7 +60,7 @@ Record the date, the Release version, who ran it, the result of every step and a
 - [ ] Site Config values (`KLOGIN_SERVERS`, `KLOGIN_NAMESPACES`, `KLOGIN_CLUSTERS`) are visible in a login shell and in `ssh host command`, and a value in `personal.env` overrides one from Site Config.
 - [ ] Write an alias into `~/.devc/personal/bashrc` and open a new terminal: the alias works, and still works after a Pod restart.
 - [ ] Tab completion of `klogin <Tab>` offers the vSphere Namespaces and `klogin <ns> <Tab>` the Guest Clusters.
-- [ ] **[unverified]** `kubectl-vsphere` is present. As the image does not ship it yet, expect `klogin` to fail on this item until it is added: record that.
+- [ ] **[unverified]** `kubectl-vsphere` is present: the Release was built with `SUPERVISOR_HOST`, and `/etc/devcontainer/release` names its version, not `absent`. If it says `absent`, expect `klogin` to fail and record that.
 - [ ] **[unverified]** Once the plugin is available, `klogin <vSphere Namespace>` logs in to the real Supervisor and sets the context, and `klogin <vSphere Namespace> <Guest Cluster>` logs in to the real Guest Cluster, using the credentials from the Secrets File. `kubectl get ns` works afterwards, and with the agent not forwarded `klogin` refuses with a clear message.
 - [ ] Installing a tool: `mkdir -p ~/.local/bin`, copy in a binary, and it is on `PATH` in a new terminal.
 

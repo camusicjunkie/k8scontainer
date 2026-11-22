@@ -20,6 +20,20 @@ tool kubens kubens --help
 tool kubeconform kubeconform -v
 tool kubeseal kubeseal --version
 tool istioctl istioctl version --remote=false
+
+# kubectl-vsphere is baked only when the build named a Supervisor; MANIFEST
+# says which, and the image must agree with it.
+vsphere_plugin_matches_manifest() {
+    local want
+    want=$(manifest_section tools | sed -n 's/^kubectl-vsphere //p')
+    [[ -n $want ]] || { echo "MANIFEST has no kubectl-vsphere line"; return 1; }
+    if [[ $want == absent ]]; then
+        ! command -v kubectl-vsphere >/dev/null || { echo "kubectl-vsphere is present but MANIFEST says absent"; return 1; }
+    else
+        timeout 30 kubectl-vsphere --help >/dev/null || { echo "kubectl-vsphere ($want) does not run"; return 1; }
+    fi
+}
+check "kubectl-vsphere is present exactly when MANIFEST says so" vsphere_plugin_matches_manifest
 tool yq yq --version
 tool jq jq --version
 

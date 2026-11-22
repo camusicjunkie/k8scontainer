@@ -64,6 +64,31 @@ RUN install -d /out/pwsh \
     && unzip -q -d /tmp/tflint /tmp/tflint.zip \
     && install -D -m 0755 /tmp/tflint/tflint /out/bin/tflint
 
+# ------------------------------------------------------------------ vsphere
+# kubectl-vsphere ships only from a Supervisor, not the Internet. Both build
+# args are site settings (CI variables or --build-arg), never committed:
+# SUPERVISOR_HOST names a Supervisor the build can reach, VSPHERE_PLUGIN_SHA256
+# pins its vsphere-plugin.zip. The Supervisor's certificate is usually its own,
+# so the zip is fetched without TLS verification and trusted by its checksum.
+# Without SUPERVISOR_HOST the image ships no plugin and klogin says so.
+FROM ${DHI_BASE} AS vsphere
+ARG SUPERVISOR_HOST=
+ARG VSPHERE_PLUGIN_SHA256=
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+# hadolint ignore=DL3008
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl unzip \
+    && rm -rf /var/lib/apt/lists/*
+RUN install -d /out/bin \
+    && if [[ -n $SUPERVISOR_HOST ]]; then \
+        [[ -n $VSPHERE_PLUGIN_SHA256 ]] \
+            || { echo "SUPERVISOR_HOST is set but VSPHERE_PLUGIN_SHA256 is not" >&2; exit 1; }; \
+        curl -fsSLk -o /tmp/plugin.zip "https://${SUPERVISOR_HOST}/wcp/plugin/linux-amd64/vsphere-plugin.zip" \
+        && echo "${VSPHERE_PLUGIN_SHA256}  /tmp/plugin.zip" | sha256sum -c - \
+        && unzip -q -j -d /tmp/plugin /tmp/plugin.zip bin/kubectl-vsphere \
+        && install -m 0755 /tmp/plugin/kubectl-vsphere /out/bin/kubectl-vsphere; \
+    fi
+
 # ------------------------------------------------------------------ python
 # The one venv, built at the path it runs from, from a wheelhouse that ships
 # with it so `pip install --no-index` works offline. Then the Ansible
@@ -206,6 +231,7 @@ COPY --from=brew-check /out/completions/ /etc/bash_completion.d/
 COPY --from=brew-check /out/brew-versions.txt /usr/local/lib/devc/brew-versions.txt
 COPY --from=hadolint /bin/hadolint /usr/local/bin/hadolint
 COPY --from=downloads /out/bin/ /usr/local/bin/
+COPY --from=vsphere /out/bin/ /usr/local/bin/
 COPY --from=downloads /out/codex/codex /usr/local/lib/codex/codex
 COPY --from=downloads /out/pwsh /opt/microsoft/powershell/7
 COPY --from=vscode --chown=1000:1000 /home/dev/.vscode-server /home/dev/.vscode-server
@@ -255,6 +281,9 @@ RUN --mount=type=bind,source=packages,target=/mnt/packages \
         printf '\n## tools\n'; \
         printf 'codex %s\n' "${CODEX_VERSION:?}"; \
         printf 'hadolint %s\n' "$(hadolint --version | awk '{ print $NF }')"; \
+        if command -v kubectl-vsphere >/dev/null; then \
+            printf 'kubectl-vsphere %s\n' "$(kubectl-vsphere version 2>/dev/null | sed -n '1s/^kubectl-vsphere: //p' | grep . || echo present)"; \
+        else printf 'kubectl-vsphere absent\n'; fi; \
         printf 'pwsh %s\n' "${PWSH_VERSION:?}"; \
         printf 'tflint %s\n' "${TFLINT_VERSION:?}"; \
         printf '\n## brew\n'; \

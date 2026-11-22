@@ -25,6 +25,10 @@
 #   DHI_USER         Docker account entitled to the DHI base on dhi.io
 #   DHI_PASSWORD     its access token, masked; if both are unset the build
 #                    pulls the base anonymously
+#   SUPERVISOR_HOST  optional: a Supervisor the runner can reach; the build
+#                    bakes its kubectl-vsphere (see image/Dockerfile)
+#   VSPHERE_PLUGIN_SHA256  that Supervisor's vsphere-plugin.zip SHA-256,
+#                    required with SUPERVISOR_HOST
 # Protect the Release tag pattern so only the Release Owner can create it. The
 # project's Container Registry holds a `candidate` image per commit.
 
@@ -68,6 +72,8 @@ build:
       buildah build
       --build-arg "DEVC_VERSION=$VERSION"
       --build-arg "DEVC_GIT_SHA=$CI_COMMIT_SHA"
+      --build-arg "SUPERVISOR_HOST=${SUPERVISOR_HOST:-}"
+      --build-arg "VSPHERE_PLUGIN_SHA256=${VSPHERE_PLUGIN_SHA256:-}"
       --tag "$CANDIDATE" image
     - buildah login --username "$CI_REGISTRY_USER" --password "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
     - buildah push "$CANDIDATE" "docker://$CANDIDATE"

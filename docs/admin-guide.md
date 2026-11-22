@@ -74,7 +74,7 @@ klogin <vSphere Namespace> <Guest Cluster>
 
 The Supervisor is `KLOGIN_SERVER` from `personal.env`, or the single entry in Site Config's `KLOGIN_SERVERS`; with several entries you must choose one. Tab completion offers Site Config's `KLOGIN_NAMESPACES` and `KLOGIN_CLUSTERS`. Logins land in `~/.kube`, which is on your volume.
 
-**Known gap:** `kubectl-vsphere` is not in the Standard Image yet (it needs a Supervisor's plugin zip). Until it is added, `klogin` runs only as far as finding it missing. Tests used a stub. **Unverified:** a real Supervisor or Guest Cluster.
+**Known gap:** `kubectl-vsphere` is in the Standard Image only when the Release Owner builds it with a Supervisor's plugin zip (`SUPERVISOR_HOST`; `/etc/devcontainer/release` says `kubectl-vsphere absent` otherwise). Without it, `klogin` runs only as far as finding it missing. Tests used a stub. **Unverified:** a real Supervisor or Guest Cluster.
 
 ## Installing a tool into your user area
 

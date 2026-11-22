@@ -12,6 +12,15 @@ For the Release Owner (and the named backup). Terms are those of `GLOSSARY.md`. 
 | `HARBOR_USER` | a Harbor robot account with push on that project |
 | `HARBOR_PASSWORD` | its secret, masked and protected |
 
+**kubectl-vsphere** (optional, needed for `klogin`). It ships only from a Supervisor, so the build fetches it from one when you set two more variables. Leave both unset and the image has no plugin; its MANIFEST says `kubectl-vsphere absent`.
+
+| Variable | Value |
+|---|---|
+| `SUPERVISOR_HOST` | a Supervisor control-plane address the runner can reach, e.g. `10.0.0.10` |
+| `VSPHERE_PLUGIN_SHA256` | the SHA-256 of `https://<SUPERVISOR_HOST>/wcp/plugin/linux-amd64/vsphere-plugin.zip` (`curl -fsSLk <url> \| sha256sum`); the build refuses any other file |
+
+The zip is fetched without TLS verification (Supervisors usually carry their own certificate) and trusted by that checksum, so update `VSPHERE_PLUGIN_SHA256` after each Supervisor upgrade: until then the build fails, by design. A hand build passes the same two values with `--build-arg`.
+
 **Protect the Release tag pattern** (`v*` and `[0-9]*`, matching `vX.Y.Z` and `X.Y.Z`) so only you can create it. Pushing a Release tag is the gate: nothing reaches a Registry until you do.
 
 **Runner needs** (from `.gitlab-ci.yml`): the job container must be allowed user namespaces (seccomp must not block `unshare`) and be given a `/dev/fuse` device, because buildah overlays the build context for `RUN --mount=type=bind`. It needs neither `--privileged` nor a Docker daemon. On a GitLab docker-executor runner that is `devices = ["/dev/fuse"]` and `security_opt = ["seccomp=unconfined", "apparmor=unconfined"]` under `[runners.docker]`; under Docker's default seccomp rules buildah fails with `unshare(CLONE_NEWUSER): Operation not permitted`.
@@ -96,5 +105,5 @@ Narrow the ImagePolicy `range` in `manifests/devcontainer/image-automation.yaml`
 
 - Certificate authority changes in Site Config reach a Pod only when its admin restarts it.
 - No script builds the Workstation pack, and the Review Packet is incomplete (see above).
-- `kubectl-vsphere` is not in the image, so `klogin` cannot complete a login yet.
+- `kubectl-vsphere` is in the image only when the build sets `SUPERVISOR_HOST` (above); without it `klogin` cannot complete a login.
 - Removing a Roster entry leaves that admin's volume behind (see the admin guide).

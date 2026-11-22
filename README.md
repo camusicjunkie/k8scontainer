@@ -297,7 +297,7 @@ What no automated seam can reach (a real Gateway under Istio, real Harbor, a rea
 
 ## Known gaps
 
-- `kubectl-vsphere` is not in the image yet, so `klogin` cannot complete a login.
+- `kubectl-vsphere` ships only from a Supervisor, so the build bakes it only when given `SUPERVISOR_HOST` and the zip's checksum (see the [Release Owner guide](docs/release-owner-guide.md)); without it, `klogin` cannot complete a login.
 - No script builds the Workstation pack, and the Review Packet has no vulnerability scan, SBOM or changelog yet.
 - The Gitops repository does not sync this repository or run its image automation yet (see [section 4](#how-this-repository-reaches-the-cluster)).
 - The ResourceSet has no `serviceAccountName`, and there is no NetworkPolicy between Pods.
