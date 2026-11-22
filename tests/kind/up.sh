@@ -102,8 +102,8 @@ EOF
 k -n flux-system wait fluxinstance/flux --for=condition=Ready --timeout 300s
 
 echo "== Kyverno and the Gitops repository's policies ($gitops)"
-# v1.19.0: what the Gitops repository's chart pin (3.9.0) installs. v1.20
-# refuses kyverno.io/v1 ClusterPolicy, which all of its policies are.
+# v1.19.0: what the Gitops repository's chart pin (3.9.0) installs; it serves
+# the policies.kyverno.io/v1 CEL policies the Gitops repository now uses.
 k apply --server-side -f https://github.com/kyverno/kyverno/releases/download/v1.19.0/install.yaml >/dev/null
 k -n kyverno rollout status deploy/kyverno-admission-controller --timeout 300s
 k -n kyverno rollout status deploy/kyverno-background-controller --timeout 300s
@@ -116,15 +116,18 @@ k -n flux-system create secret docker-registry harbor-pull --docker-server "$reg
 # One local change, printed: local-path-storage, flux-system and kyverno join
 # the exclusions. Here their images come from public registries and are not
 # mirrored to REGISTRY; on the Management Cluster they already come from Harbor.
+# The policies are CEL (policies.kyverno.io/v1); a cluster set up before they
+# were still has the ClusterPolicies they replaced, which would keep rewriting.
+k delete clusterpolicy --all --ignore-not-found >/dev/null 2>&1 || true
 k kustomize "$gitops/apps/kyverno/configs" \
     | envsubst '$KYVERNO_VALIDATION_ACTION $HARBOR_REGISTRY $HARBOR_PROJECT' \
-    | sed -e 's/^\( *\)- kube-node-lease$/&\n\1- local-path-storage\n\1- flux-system\n\1- kyverno/' \
+    | sed -E "s/kube-node-lease('+)\]\)/kube-node-lease\1, \1local-path-storage\1, \1flux-system\1, \1kyverno\1])/" \
     | tee "${TMPDIR:-/tmp}/devc-kind-policies.yaml" | k apply -f -
 echo "local changes to the Gitops policies:"
 k kustomize "$gitops/apps/kyverno/configs" \
     | envsubst '$KYVERNO_VALIDATION_ACTION $HARBOR_REGISTRY $HARBOR_PROJECT' \
     | diff - "${TMPDIR:-/tmp}/devc-kind-policies.yaml" | grep '^[<>]' || true
-k wait clusterpolicy --all --for=condition=Ready --timeout 120s
+k wait mutatingpolicy,validatingpolicy,generatingpolicy --all --for=jsonpath='{.status.conditionStatus.ready}'=true --timeout 120s
 
 istio=$(sed -n 's/^ *tag: "\([^"]*\)".*/\1/p' "$gitops/apps/istio/controllers/istiod/ocirepository.yaml")
 echo "== Istio $istio, gateway only"
