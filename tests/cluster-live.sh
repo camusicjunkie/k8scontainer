@@ -41,9 +41,11 @@ until_true() {  # until_true SECONDS COMMAND: retries, reconciling Flux each tim
     local end=$((SECONDS + $1)); shift
     until eval "$*"; do ((SECONDS < end)) || return 1; reconcile; sleep 5; done
 }
-# Fast-forward the synced branch to the automation's push branch once that
-# carries TAG, as merging the update would. The credentials go from the
-# cluster's secret to the container's environment, never onto a command line.
+# Merge the automation's push branch into the synced branch once it carries
+# TAG, as merging the update's merge request would. A real merge, not a
+# fast-forward: the synced branch may have moved since the push branch was cut.
+# The credentials go from the cluster's secret to the container's environment,
+# never onto a command line.
 merge_updates() {  # merge_updates TAG
     local url branch push
     url=$(k -n flux-system get gitrepository k8scontainer -o jsonpath='{.spec.url}')
@@ -55,9 +57,12 @@ merge_updates() {  # merge_updates TAG
         -e URL="$url" -e BRANCH="$branch" -e PUSH="$push" -e TAG="$1" alpine/git:v2.49.1 -c '
         cred="!f() { echo username=\$GIT_USER; echo password=\$GIT_PASS; }; f"
         git init -q /r && cd /r &&
-        git -c credential.helper="$cred" fetch -q "$URL" "$PUSH" &&
-        git show FETCH_HEAD:manifests/devcontainer/roster.yaml | grep -qF ":$TAG " &&
-        git -c credential.helper="$cred" push -q "$URL" "FETCH_HEAD:refs/heads/$BRANCH"' >/dev/null 2>&1
+        git -c credential.helper="$cred" fetch -q "$URL" "$BRANCH:synced" "$PUSH:update" &&
+        git show update:manifests/devcontainer/roster.yaml | grep -qF ":$TAG " &&
+        git checkout -q synced &&
+        git -c user.name=reviewer -c user.email=reviewer@lab.local merge -q --no-edit \
+            -m "Merge $PUSH into $BRANCH [skip ci]" update &&
+        git -c credential.helper="$cred" push -q "$URL" "HEAD:refs/heads/$BRANCH"' >/dev/null 2>&1
 }
 pod_image() { k -n $ns get pod devc-admin-0 -o jsonpath='{.spec.containers[0].image}' 2>/dev/null; }
 sts_image() { k -n $ns get sts devc-admin -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null; }
