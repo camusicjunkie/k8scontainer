@@ -113,7 +113,9 @@ echo "== harbor-pull"
 # Devcontainer Namespace (copyFrom). REGISTRY needs no login; the Secret is
 # here so the Pods reference it exactly as they do there.
 pull_secret() {  # pull_secret NAMESPACE
-    k create namespace "$1" --dry-run=client -o yaml | k apply -f - >/dev/null
+    # Created only if missing: applying a bare Namespace over namespace.yaml's
+    # would drop the labels that apply had set (Pod Security restricted).
+    k get namespace "$1" >/dev/null 2>&1 || k create namespace "$1" >/dev/null
     k -n "$1" create secret docker-registry harbor-pull --docker-server "$registry" \
         --docker-username kind --docker-password kind --dry-run=client -o yaml | k apply -f - >/dev/null
 }
