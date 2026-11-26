@@ -324,6 +324,12 @@ RUN install -d /etc/devc \
     && install -d -o dev -g dev -m 0700 /var/lib/devc/hostkeys
 EXPOSE 2222
 
+# The Release's own labels: release/cut.sh copies them into the Review Packet.
+# Last, so a new version or commit doesn't invalidate the cached layers above.
+LABEL org.opencontainers.image.title="Standard Image" \
+      org.opencontainers.image.version="${DEVC_VERSION}" \
+      org.opencontainers.image.revision="${DEVC_GIT_SHA}"
+
 USER dev
 WORKDIR /home/dev
 ENTRYPOINT ["/usr/local/bin/devc-entrypoint"]

@@ -47,7 +47,8 @@ sleep 2
 # A tagged image on the Connected Side, in OCI format as buildah produces it.
 mkdir -p "$work/src" "$work/out" "$work/release"
 cp "$repo"/release/*.sh "$work/release/"
-printf 'FROM scratch\nCOPY marker /marker\n' >"$work/src/Dockerfile"
+printf 'FROM scratch\nCOPY marker /marker\nLABEL org.opencontainers.image.version="1.2.3" org.opencontainers.image.revision="0123abc"\n' \
+    >"$work/src/Dockerfile"
 echo "release test $$" >"$work/src/marker"
 docker build -q -t devc-rel-src:$$ "$(native "$work/src")" >/dev/null || exit 1
 docker save devc-rel-src:$$ -o "$(native "$work/src.tar")" && docker rmi devc-rel-src:$$ >/dev/null
@@ -69,6 +70,8 @@ check "the Review Packet names the version, checksum and image digest" bash -c "
     grep -q '1.2.3' '$packet' &&
     grep -q \"\$(cut -d' ' -f1 '$work/out/devcontainer-1.2.3.oci.tar.sha256')\" '$packet' &&
     grep -q '$src_digest' '$packet'"
+check "the Review Packet carries the image's version and revision labels" bash -c "
+    grep -qx -- '- version: 1.2.3' '$packet' && grep -qx -- '- revision: 0123abc' '$packet'"
 
 in_skopeo bash /work/release/cut.sh "$conn/standard:1.2.3" 1.2.3 /work/out >/dev/null 2>&1
 check "cut refuses to overwrite an existing Release" test $? -ne 0
