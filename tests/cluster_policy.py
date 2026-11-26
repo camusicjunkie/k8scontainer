@@ -13,7 +13,9 @@ there, and everything per admin is checked for every admin in it:
     python3 tests/cluster_policy.py ROSTER.yaml <rendered.yaml
 """
 import base64
+import re
 import sys
+from pathlib import Path
 
 import yaml
 
@@ -22,6 +24,15 @@ roster = inputs["admins"]
 storage_class = inputs.get("storageClass")  # absent: the claim names no class
 docs = [d for d in yaml.safe_load_all(sys.stdin) if d]
 failed = []
+
+# The Roster keys the ResourceSet template reads: `inputs.x` and `$a.x` must be
+# there, `get inputs "x"` and `dig "x"` may be. A key outside these (a Roster
+# kept from another network in an older format, say) would be silently ignored.
+template = (Path(__file__).resolve().parent.parent / "manifests/devcontainer/resourceset.yaml").read_text()
+TOP_REQUIRED = set(re.findall(r"\binputs\.(\w+)", template))
+TOP_OPTIONAL = set(re.findall(r'\bget inputs "(\w+)"', template))
+ADMIN_REQUIRED = set(re.findall(r"\$a\.(\w+)", template))
+ADMIN_OPTIONAL = set(re.findall(r'\bdig "(\w+)"', template))
 
 DEFAULT_RESOURCES = {"requests": {"cpu": "250m", "memory": "512Mi"}, "limits": {"cpu": "2", "memory": "4Gi"}}
 WANT_PATHS = {"workspace": "/home/dev/workspace", ".kube": "/home/dev/.kube", ".secrets": "/home/dev/.secrets",
@@ -59,6 +70,13 @@ check("namespace enforces Pod Security restricted", labels.get("pod-security.kub
 check("every namespaced object is in the Devcontainer Namespace",
       all(d["metadata"].get("namespace") == ns["metadata"]["name"] for d in docs if d["kind"] != "Namespace"))
 check("nothing from the Roster machinery itself is rendered as a workload", not of("ResourceSet"))
+
+check(f"the Roster has every key the ResourceSet reads ({', '.join(sorted(TOP_REQUIRED))}) and no other "
+      f"but {', '.join(sorted(TOP_OPTIONAL))}",
+      TOP_REQUIRED <= set(inputs) <= TOP_REQUIRED | TOP_OPTIONAL)
+check(f"every Roster entry has {', '.join(sorted(ADMIN_REQUIRED))} and no other key but "
+      f"{', '.join(sorted(ADMIN_OPTIONAL))}",
+      all(ADMIN_REQUIRED <= set(a) <= ADMIN_REQUIRED | ADMIN_OPTIONAL for a in roster))
 
 names = [a["name"] for a in roster]
 ports = [a["port"] for a in roster]
