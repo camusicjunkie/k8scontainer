@@ -15,6 +15,8 @@ from pathlib import Path
 import yaml
 
 CI = Path(__file__).resolve().parent.parent / ".gitlab-ci.yml"
+DOCKERFILE = CI.parent / "image/Dockerfile"
+LINTERS = ("shellcheck", "hadolint")
 TOKEN = re.compile(r'\s*(&&|\|\||==|!=|=~|!~|\$\w+|"[^"]*"|/(?:\\/|[^/])*/|\(|\)|null)')
 
 
@@ -108,13 +110,13 @@ def jobs_for(cfg, env):
 
 
 REFS = {
-    "push to main": ({"CI_COMMIT_BRANCH": "main", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks"}),
-    "push to a feature branch": ({"CI_COMMIT_BRANCH": "feat/x", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks"}),
-    "merge request": ({"CI_PIPELINE_SOURCE": "merge_request_event", "CI_MERGE_REQUEST_IID": "3"}, {"build", "selftest", "checks"}),
-    "Release tag v1.2.3": ({"CI_COMMIT_TAG": "v1.2.3", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks", "publish"}),
-    "Release tag 2026.11.2": ({"CI_COMMIT_TAG": "2026.11.2", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks", "publish"}),
-    "non-Release tag 'wip'": ({"CI_COMMIT_TAG": "wip", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks"}),
-    "tag 'v1.2.3-oops'": ({"CI_COMMIT_TAG": "v1.2.3-oops", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks"}),
+    "push to main": ({"CI_COMMIT_BRANCH": "main", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks", *LINTERS}),
+    "push to a feature branch": ({"CI_COMMIT_BRANCH": "feat/x", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks", *LINTERS}),
+    "merge request": ({"CI_PIPELINE_SOURCE": "merge_request_event", "CI_MERGE_REQUEST_IID": "3"}, {"build", "selftest", "checks", *LINTERS}),
+    "Release tag v1.2.3": ({"CI_COMMIT_TAG": "v1.2.3", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks", *LINTERS, "publish"}),
+    "Release tag 2026.11.2": ({"CI_COMMIT_TAG": "2026.11.2", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks", *LINTERS, "publish"}),
+    "non-Release tag 'wip'": ({"CI_COMMIT_TAG": "wip", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks", *LINTERS}),
+    "tag 'v1.2.3-oops'": ({"CI_COMMIT_TAG": "v1.2.3-oops", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks", *LINTERS}),
 }
 
 failed = []
@@ -160,6 +162,20 @@ else:
     check("publish waits on the repo checks", "checks" in publish_needs)
     check("the checks job runs tests/all.sh --files",
           "tests/all.sh --files" in "\n".join(cfg.get("checks", {}).get("script", [])))
+    # The linters run beside the file checks, from pinned images, so CI never
+    # skips them as tests/all.sh does on a machine without them.
+    for lint in LINTERS:
+        job = cfg.get(lint, {})
+        check(f"the {lint} job runs tests/lint.sh {lint} in the checks' stage",
+              job.get("stage") == cfg.get("checks", {}).get("stage")
+              and f"tests/lint.sh {lint}" in "\n".join(job.get("script", [])))
+        check(f"publish waits on {lint}", lint in publish_needs)
+    image = lambda j: str(j.get("image", {}).get("name") if isinstance(j.get("image"), dict) else j.get("image"))
+    pin = re.search(r"^ARG HADOLINT_IMAGE=(\S+)", DOCKERFILE.read_text(), re.M)
+    check("the hadolint job uses the image the Dockerfile's HADOLINT_IMAGE pins",
+          pin is not None and image(cfg.get("hadolint", {})) == pin.group(1),
+          f"{image(cfg.get('hadolint', {}))} vs {pin and pin.group(1)}")
+    check("the shellcheck job's image is pinned by digest", "@sha256:" in image(cfg.get("shellcheck", {})))
     check("Harbor credentials appear only in the publish job", all(
         "HARBOR" not in yaml.dump(j) for n, j in cfg.items() if isinstance(j, dict) and n != "publish"))
     candidate = str(cfg.get("variables", {}).get("CANDIDATE", ""))

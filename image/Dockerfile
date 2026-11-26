@@ -331,7 +331,8 @@ LABEL org.opencontainers.image.title="Standard Image" \
       org.opencontainers.image.version="${DEVC_VERSION}" \
       org.opencontainers.image.revision="${DEVC_GIT_SHA}"
 
-USER dev
+# dev by number, so a kubelet can check runAsNonRoot against the image itself.
+USER 1000:1000
 WORKDIR /home/dev
 ENTRYPOINT ["/usr/local/bin/devc-entrypoint"]
 CMD ["devc-sshd"]

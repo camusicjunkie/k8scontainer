@@ -4,6 +4,9 @@
 #   tests/all.sh           every check this machine can run
 #   tests/all.sh --files   only the file checks (what the pipeline's `checks` job runs)
 #
+# The linters (tests/lint.sh) run here when installed; the pipeline runs them
+# in jobs of their own.
+#
 # The file checks (tests/ci.py, tests/repo.py, docs/check.sh) always run; they
 # need only bash and python3 with PyYAML. Each seam that needs tools runs only when they are present, and is
 # reported as SKIP otherwise, so a green run here says what it did not cover.
@@ -28,6 +31,10 @@ run docs/check.sh bash docs/check.sh
 
 if [[ ${1:-} == --files ]]; then :
 else
+    # The pipeline runs the linters in their own jobs, from pinned images.
+    for lint in shellcheck hadolint; do
+        if has "$lint"; then run "tests/lint.sh $lint" sh tests/lint.sh "$lint"; else skip "tests/lint.sh $lint" "$lint"; fi
+    done
     if docker_up; then
         run tests/image.sh bash tests/image.sh
         run tests/release.sh bash tests/release.sh

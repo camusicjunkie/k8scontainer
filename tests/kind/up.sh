@@ -166,9 +166,11 @@ if [[ -n ${GIT_URL:-} ]]; then
         -p '{"automountServiceAccountToken":false,"imagePullSecrets":[{"name":"harbor-pull"}]}' >/dev/null
     k -n devcontainer create secret generic devc-git-push --from-literal=username="$GIT_USER" \
         --from-literal=password="${GIT_PUSH_TOKEN:-$GIT_TOKEN}" --dry-run=client -o yaml | k apply -f - >/dev/null
+    TEST_PUBKEY=$(cat "$state/id_rsa.pub")
+    SITE_ENV_B64=$(base64 -w0 "$here/../site/site.env")
+    SITE_CA_B64=$(base64 -w0 "$here/../site/site-ca.crt")
     export GIT_URL GIT_BRANCH GIT_PUSH_BRANCH=${GIT_PUSH_BRANCH:-$GIT_BRANCH-image-updates} \
-        REGISTRY=$registry HARBOR_PROJECT=$harbor_project TEST_PUBKEY=$(cat "$state/id_rsa.pub") \
-        SITE_ENV_B64=$(base64 -w0 "$here/../site/site.env") SITE_CA_B64=$(base64 -w0 "$here/../site/site-ca.crt")
+        REGISTRY=$registry HARBOR_PROJECT=$harbor_project TEST_PUBKEY SITE_ENV_B64 SITE_CA_B64
     envsubst '$GIT_URL $GIT_BRANCH $GIT_PUSH_BRANCH $REGISTRY $HARBOR_PROJECT $TEST_PUBKEY $SITE_ENV_B64 $SITE_CA_B64' \
         <"$here/flux.yaml" | k apply -f -
     k -n flux-system wait kustomization/devcontainer --for=condition=Ready --timeout 300s

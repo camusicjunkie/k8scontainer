@@ -67,7 +67,7 @@ merge_updates() {  # merge_updates TAG
 }
 pod_image() { k -n $ns get pod devc-admin-0 -o jsonpath='{.spec.containers[0].image}' 2>/dev/null; }
 sts_image() { k -n $ns get sts devc-admin -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null; }
-pod_ready() { k -n $ns wait pod/devc-admin-0 --for=condition=Ready --timeout "${1:-600}s" >/dev/null 2>&1; }
+pod_ready() { k -n $ns wait pod/devc-admin-0 --for=condition=Ready --timeout 600s >/dev/null 2>&1; }
 restart() { k -n $ns delete pod devc-admin-0 --wait=true >/dev/null; sleep 2; pod_ready; }
 
 # ssh to the admin's Pod through a port-forward to a Service: by default the
