@@ -18,7 +18,7 @@
 #   clusters/management/devcontainer.yaml does, harbor-pull is put in
 #   istio-system and in the Devcontainer Namespace, on its default
 #   ServiceAccount, and the Roster names REGISTRY directly (tests/kind/flux.yaml
-#   patches it), so nothing rewrites images.
+#   substitutes it as a runtime fact), so nothing rewrites images.
 #
 # REGISTRY is a plain-HTTP registry on DOCKER_NETWORK; the node joins that
 # network, so it can also reach a Git server there (the local GitLab).
@@ -152,17 +152,23 @@ if [[ -n ${GIT_URL:-} ]]; then
     [[ -f $state/id_rsa ]] || ssh-keygen -q -t rsa -b 2048 -N '' -C test-smartcard -f "$state/id_rsa"
     k -n flux-system create secret generic devc-git-read --from-literal=username="${GIT_USER:?}" \
         --from-literal=password="${GIT_TOKEN:?}" --dry-run=client -o yaml | k apply -f - >/dev/null
-    # The automation lives in the namespace the Kustomization creates. As the
-    # Gitops repository's devcontainer.yaml does: harbor-pull on the default
-    # ServiceAccount, which the Devcontainer Pods use, and no API token.
+    # As the Gitops repository's devcontainer.yaml does: it owns the
+    # Devcontainer Namespace (the manifests don't), puts harbor-pull on its
+    # default ServiceAccount (the Pods use it) with no API token, and gives the
+    # ImageRepository harbor-ca (here the test site CA; the registry is HTTP).
+    k apply -f "$here/namespace.yaml" >/dev/null
     pull_secret devcontainer
+    k -n devcontainer create secret generic harbor-ca --from-file=ca.crt="$here/../site/site-ca.crt" \
+        --dry-run=client -o yaml | k apply -f - >/dev/null
     k -n devcontainer patch serviceaccount default --type merge \
         -p '{"automountServiceAccountToken":false,"imagePullSecrets":[{"name":"harbor-pull"}]}' >/dev/null
     k -n devcontainer create secret generic devc-git-push --from-literal=username="$GIT_USER" \
         --from-literal=password="${GIT_PUSH_TOKEN:-$GIT_TOKEN}" --dry-run=client -o yaml | k apply -f - >/dev/null
     export GIT_URL GIT_BRANCH GIT_PUSH_BRANCH=${GIT_PUSH_BRANCH:-$GIT_BRANCH-image-updates} \
-        REGISTRY=$registry HARBOR_PROJECT=$harbor_project TEST_PUBKEY=$(cat "$state/id_rsa.pub")
-    envsubst '$GIT_URL $GIT_BRANCH $GIT_PUSH_BRANCH $REGISTRY $HARBOR_PROJECT $TEST_PUBKEY' <"$here/flux.yaml" | k apply -f -
+        REGISTRY=$registry HARBOR_PROJECT=$harbor_project TEST_PUBKEY=$(cat "$state/id_rsa.pub") \
+        SITE_ENV_B64=$(base64 -w0 "$here/../site/site.env") SITE_CA_B64=$(base64 -w0 "$here/../site/site-ca.crt")
+    envsubst '$GIT_URL $GIT_BRANCH $GIT_PUSH_BRANCH $REGISTRY $HARBOR_PROJECT $TEST_PUBKEY $SITE_ENV_B64 $SITE_CA_B64' \
+        <"$here/flux.yaml" | k apply -f -
     k -n flux-system wait kustomization/devcontainer --for=condition=Ready --timeout 300s
 fi
 

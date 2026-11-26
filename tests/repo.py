@@ -106,6 +106,20 @@ for p in files("image/**/*", "manifests/**/*", "tests/**/*", "release/**/*", "wo
                 hits.append(f"{p.relative_to(ROOT).as_posix()}:{n} '{t}'")
 check(f"no GLOSSARY _Avoid_ term in code comments ({', '.join(avoid)})", not hits, "; ".join(hits))
 
+# 3b. Runtime facts: the Flux variables the manifests use are exactly the
+# contract in tests/site/facts.env, which the Gitops repository's bootstrap
+# writes into flux-runtime-info. With strict substitution, a variable missing
+# there fails the sync; one listed but unused is a stale contract.
+contract = {l.split("=", 1)[0].strip() for l in text(ROOT / "tests/site/facts.env").splitlines()
+            if l.strip() and not l.lstrip().startswith("#")}
+used = set()
+for p in files("manifests/**/*.yaml"):
+    used |= set(re.findall(r"\$\{([A-Za-z_][A-Za-z0-9_]*)", text(p)))
+check("every Flux variable in manifests/ is a runtime fact in tests/site/facts.env", used <= contract,
+      ", ".join(sorted(used - contract)))
+check("every runtime fact in tests/site/facts.env is used in manifests/", contract <= used,
+      ", ".join(sorted(contract - used)))
+
 # 4. Ticket hygiene.
 open_items = []
 for p in files(".scratch/*/issues/*.md"):

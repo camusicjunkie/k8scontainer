@@ -2,7 +2,9 @@
 # Cluster should run it: Flux syncs manifests/devcontainer from GIT_BRANCH
 # with a read-only credential, and the image automation commits Roster
 # updates to GIT_PUSH_BRANCH with its own write credential, for someone to
-# merge. envsubst fills ${...}.
+# merge. tests/kind/up.sh's envsubst fills the ${...} below; the runtime facts
+# go to Flux in postBuild.substitute, as the Management Cluster's come from
+# flux-runtime-info (tests/site/facts.env lists them).
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository
 metadata:
@@ -31,21 +33,20 @@ spec:
     kind: GitRepository
     name: k8scontainer
   path: ./manifests/devcontainer
+  postBuild:
+    substitute:
+      HARBOR_REGISTRY: "${REGISTRY}"
+      HARBOR_PROJECT: "${HARBOR_PROJECT}"
+      DEVCONTAINER_SITE_ENV_B64: "${SITE_ENV_B64}"
+      DEVCONTAINER_SITE_CA_B64: "${SITE_CA_B64}"
+      DEVCONTAINER_POD_CIDR: "10.244.0.0/16"
+  # Test-only: the registry is plain HTTP, and the Roster gets the test's key.
   patches:
-    # This registry in place of harbor.example, scanned over plain HTTP.
     - target: { kind: ImageRepository, name: devcontainer-standard }
       patch: |
-        - { op: replace, path: /spec/image, value: ${REGISTRY}/${HARBOR_PROJECT}/devcontainer/standard }
         - { op: add, path: /spec/insecure, value: true }
-    # kind's Pod network in place of VKS's default.
-    - target: { kind: NetworkPolicy, name: devcontainer-pods }
-      patch: |
-        - { op: replace, path: /spec/egress/1/to/0/ipBlock/except/0, value: 10.244.0.0/16 }
-    # The Roster: this registry's repository in place of the placeholder (as
-    # the Gitops repository patches in its Harbor), and the test's own key.
     - target: { kind: ResourceSetInputProvider, name: roster }
       patch: |
-        - { op: replace, path: /spec/defaultValues/imageRepository, value: ${REGISTRY}/${HARBOR_PROJECT}/devcontainer/standard }
         - { op: replace, path: /spec/defaultValues/admins/0/publicKey, value: "${TEST_PUBKEY}" }
 ---
 # The automation and its source sit in the devcontainer namespace: an

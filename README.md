@@ -131,14 +131,14 @@ A Release is one image archive plus its checksum. Two scripts move it, both usin
 
 ## 4. On the Management Cluster
 
-Flux applies [`manifests/devcontainer/`](manifests/devcontainer/kustomization.yaml). Nothing per-admin is written by hand: the Roster is data, and a ResourceSet turns it into objects.
+Flux applies [`manifests/devcontainer/`](manifests/devcontainer/kustomization.yaml). Nothing per-admin is written by hand: the Roster is data, and a ResourceSet turns it into objects. Nothing network-specific is committed either: those values are Flux variables, filled from the network's runtime facts ([below](#runtime-facts)). The Devcontainer Namespace itself (Pod Security `restricted`) belongs to whoever syncs this directory, so it outlives a prune and keeps the admins' volumes.
 
 | File | Object | Role |
 |---|---|---|
-| `namespace.yaml` | Namespace `devcontainer` | the Devcontainer Namespace. Enforces Pod Security `restricted`. |
-| `site-config.yaml` | ConfigMap `site-config` | the network's Site Config: `site.env` (`KLOGIN_SERVERS`, `KLOGIN_NAMESPACES`, `KLOGIN_CLUSTERS`, and `AI_GATEWAY_URL` where the site has one) and `site-ca.crt`. A placeholder here; each network supplies its own values. |
-| `roster.yaml` | ResourceSetInputProvider `roster` (Static) | the Roster: the Standard Image every Pod runs, as `imageRepository` (a placeholder each network's Kustomization patches with its Registry) and `imageTag` (the one value the image automation rewrites), an optional `gatewayAddress` for the shared Gateway, an optional `storageClass` for every volume (left out, the cluster's default class), and the `admins` list (`name`, `port`, `publicKey`, optional `resources`). |
-| `image-automation.yaml` | ImageRepository and ImagePolicy `devcontainer-standard` | scan the Registry every 5 minutes and pick the newest Release tag (`semver ">=0.1.0"`, never a pre-release). |
+| `site-config.yaml` | ConfigMap `site-config` | the network's Site Config, from runtime facts: `site.env` (`KLOGIN_SERVERS`, `KLOGIN_NAMESPACES`, `KLOGIN_CLUSTERS`, and `AI_GATEWAY_URL` where the site has one) and `site-ca.crt`. |
+| `roster.yaml` | ResourceSetInputProvider `roster` (Static) | the Roster: the Standard Image every Pod runs, as `imageRepository` (the network's Registry, from runtime facts) and `imageTag` (the one value the image automation rewrites), `gatewayAddress` for the shared Gateway (from runtime facts; empty, the load balancer picks), an optional `storageClass` for every volume (left out, the cluster's default class), and the `admins` list (`name`, `port`, `publicKey`, optional `resources`). |
+| `image-automation.yaml` | ImageRepository and ImagePolicy `devcontainer-standard` | scan the Registry every 5 minutes, trusting `harbor-ca` and logging in with `harbor-pull`, and pick the newest Release tag (`semver ">=0.1.0"`, never a pre-release). |
+| `networkpolicy.yaml` | NetworkPolicy `devcontainer-pods` | SSH into a Pod only from the shared Gateway; egress to DNS and outside the cluster's Pod network, never to other Pods. |
 | `resourceset.yaml` | ResourceSet `devcontainer` | renders everything below from the Roster. |
 
 ### What the ResourceSet generates
@@ -164,18 +164,27 @@ The Pod runs as UID 1000 with all capabilities dropped, no privilege escalation,
 
 ### How this repository reaches the cluster
 
-The clusters' Flux setup lives in the Gitops repository (`camusicjunkie/Gitops`): its `clusters/management/devcontainer.yaml` ResourceSet holds the GitRepositories and Kustomization that sync `manifests/devcontainer` from this repository, and the ImageUpdateAutomation (camusicjunkie/Gitops#3). [`tests/kind/flux.yaml`](tests/kind/flux.yaml) is a smaller working example of the same:
-
-- a read-only GitRepository and a Kustomization syncing `./manifests/devcontainer`, patching the Roster's `imageRepository` and the ImageRepository with the network's Registry;
-- in the `devcontainer` namespace, an ImageUpdateAutomation with its own write credential, pushing to a separate branch (`image-updates`).
+The clusters' Flux setup lives in the Gitops repository (`camusicjunkie/Gitops`): its `clusters/management/devcontainer.yaml` ResourceSet owns the Devcontainer Namespace and holds the GitRepositories, the ImageUpdateAutomation and the Kustomization that syncs `manifests/devcontainer` with `postBuild.substituteFrom: flux-runtime-info`. [`tests/kind/flux.yaml`](tests/kind/flux.yaml) is a smaller working example of the same, with the test values in `postBuild.substitute`.
 
 The automation must live in `devcontainer`, because an automation only applies ImagePolicies in its own namespace. It holds push credentials, which is why it isn't in this repository.
 
+#### Runtime facts
+
+Every network-specific value is a Flux variable that the syncing Kustomization substitutes from the network's runtime facts. The Gitops repository's bootstrap writes them into `flux-runtime-info`; [`tests/site/facts.env`](tests/site/facts.env) is the contract and holds the test values. `tests/repo.py` fails if a manifest uses a variable not listed there, and the Gitops sync, with strict substitution, fails if a variable without a default is missing.
+
+| Variable | Used for | Gitops bootstrap variable |
+|---|---|---|
+| `HARBOR_REGISTRY`, `HARBOR_PROJECT` | the Roster's `imageRepository` and the ImageRepository: `<registry>/<project>/devcontainer/standard` | `harbor_registry`, `harbor_project` |
+| `DEVCONTAINER_SITE_ENV_B64` | Site Config's `site.env`, base64 | `devcontainer_site_env` (a map) |
+| `DEVCONTAINER_SITE_CA_B64` | Site Config's `site-ca.crt`, base64 | `devcontainer_site_ca` (default: `harbor_ca`) |
+| `DEVCONTAINER_GATEWAY_ADDRESS` | the Roster's `gatewayAddress`; default empty | `devcontainer_gateway_address` |
+| `DEVCONTAINER_POD_CIDR` | the Pod network the NetworkPolicy keeps Pods from; default `192.168.0.0/16`, VKS's | `devcontainer_pod_cidr` |
+
+Write a new one as a variable here, add it to `tests/site/facts.env` and this table, and add it to the Gitops repository's bootstrap in the same change.
+
 What else the Gitops repository supplies on the Management Cluster:
 
-- **No Kyverno.** The Management Cluster runs no Kyverno, so nothing rewrites images or copies Secrets: the Roster's `imageRepository` must name the Registry directly (the Kustomization patches it), and the Gitops ResourceSet copies `harbor-pull` and `harbor-ca` into the Devcontainer Namespace and puts `harbor-pull` on its default ServiceAccount, which the Pods use. `tests/kind/up.sh` does the same, without Kyverno, so the live seam runs under the same admission as the cluster.
-- **Site Config** comes from the Gitops side too: it deletes this repository's placeholder `site-config` and renders the network's own from runtime facts its bootstrap writes (KLOGIN settings, the AI gateway, site CAs), so nothing network-specific is committed here.
-- **Per-network values** it patches in: the Registry repository, the Gateway's address (`gatewayAddress`, optional), and the cluster's Pod CIDR in the NetworkPolicy.
+- **No Kyverno.** The Management Cluster runs no Kyverno, so nothing rewrites images or copies Secrets: the Roster's `imageRepository` names the Registry directly, and the Gitops ResourceSet copies `harbor-pull` and `harbor-ca` into the Devcontainer Namespace and puts `harbor-pull` on its default ServiceAccount, which the Pods use. `tests/kind/up.sh` does the same, without Kyverno, so the live seam runs under the same admission as the cluster.
 - **Istio** (`gatewayClassName: istio`, from the Gitops repository's `clusters/management/istio.yaml`) programs the Gateway: a gateway deployment behind one LoadBalancer IP that forwards each listener's TCP to its admin's Service. No mesh is needed; the Devcontainer Namespace does not join ambient or take sidecars. It needs Istio 1.31 or later, which reads TCPRoute at `v1` (GA in the Gateway API standard channel since v1.6.0); Istio 1.30 read only `v1alpha2`, which the standard channel no longer serves. The Gitops repository's `clusters/management/istio.yaml` installs it. `gateway-options.yaml` sets the `seccompProfile` that Pod Security `restricted` requires on the gateway Deployment Istio generates.
 
 ## 5. How an admin connects
@@ -259,8 +268,9 @@ Several values appear on more than one side. If they drift apart, the parts stil
 |---|---|---|
 | VS Code commit | `image/packages/vscode.env` ↔ the server baked into the image ↔ the Workstation pack's `release.json` and zip | the image build (server checksum) and `install.ps1` (refuses another commit or zip) |
 | sshd port 2222 | `devc-sshd` ↔ the Dockerfile's `EXPOSE` ↔ the ResourceSet's `containerPort`, Services, TCPRoute and readiness probe (`/tmp/devc-sshd-2222.pid`) ↔ the NetworkPolicy's ingress port | `tests/image.sh`, `tests/cluster_policy.py` |
-| Registry repository | the Roster's `imageRepository` ↔ the ImageRepository's `spec.image`, both patched per network by the Gitops repository | `tests/cluster_update.py`, `tests/cluster-live.sh` |
-| Pod CIDR | the NetworkPolicy's egress `except` ↔ the cluster's own Pod network, patched per network by the Gitops repository | e2e checklist section 2 |
+| Runtime facts | every Flux variable in `manifests/` ↔ `tests/site/facts.env` ↔ the Gitops repository's bootstrap (`flux-runtime-info`) ↔ the README's "Runtime facts" table | `tests/repo.py`, `docs/check.sh`; strict substitution fails the sync on a missing one |
+| Registry repository | the Roster's `imageRepository` ↔ the ImageRepository's `spec.image`, the same runtime facts | `tests/cluster_update.py`, `tests/cluster-live.sh` |
+| Pod CIDR | the NetworkPolicy's egress `except` (`DEVCONTAINER_POD_CIDR`) ↔ the cluster's own Pod network | e2e checklist section 2 |
 | Pod-side paths: State Directory mounts, `/etc/devc/authorized_keys`, `/etc/devcontainer/site/…` | the ResourceSet's `volumeMounts` ↔ every such path the image reads | `tests/repo.py` |
 | Image marker | `roster.yaml`'s `$imagepolicy` comment ↔ the ImagePolicy `devcontainer/devcontainer-standard` | `docs/check.sh`, `tests/cluster-live.sh` |
 | CI variable names | `.gitlab-ci.yml` ↔ the Release Owner guide | `docs/check.sh` |

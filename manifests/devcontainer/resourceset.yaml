@@ -37,13 +37,14 @@ spec:
       namespace: devcontainer
     spec:
       gatewayClassName: istio
-      # The Roster's gatewayAddress, when set, pins the LoadBalancer IP, so the
-      # address in every Workstation's SSH config survives the Gateway being
-      # recreated. Left out, the load balancer picks one.
-      <<- with get inputs "gatewayAddress" >>
+      # The Roster's gatewayAddress, unless it is `none`, pins the LoadBalancer
+      # IP, so the address in every Workstation's SSH config survives the
+      # Gateway being recreated. Otherwise the load balancer picks one.
+      <<- $addr := get inputs "gatewayAddress" >>
+      <<- if and $addr (ne $addr "none") >>
       addresses:
         - type: IPAddress
-          value: << . >>
+          value: << $addr >>
       <<- end >>
       # Istio merges this ConfigMap into the gateway Deployment it generates
       # (gateway-options.yaml), so the gateway Pod passes Pod Security.

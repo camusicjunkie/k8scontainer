@@ -6,9 +6,8 @@
 #   to other Pods. sshd allows TCP forwarding (Remote-SSH needs it), so without
 #   this an admin's session would be a way into the Management Cluster's own
 #   workloads.
-# The Pod CIDR is the one per-network value: 192.168.0.0/16 is VKS's default.
-# The Kustomization that syncs this directory patches the cluster's own
-# (tests/kind/flux.yaml patches kind's 10.244.0.0/16). Kubelet probes come from
+# The Pod CIDR is the one per-network value, from the network's runtime facts
+# (DEVCONTAINER_POD_CIDR); without it, VKS's default 192.168.0.0/16. Kubelet probes come from
 # the node, not a Pod, and the readiness probe is an exec anyway.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -44,4 +43,4 @@ spec:
         - ipBlock:
             cidr: 0.0.0.0/0
             except:
-              - 192.168.0.0/16
+              - ${DEVCONTAINER_POD_CIDR:=192.168.0.0/16}

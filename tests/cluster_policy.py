@@ -12,6 +12,7 @@ there, and everything per admin is checked for every admin in it:
 
     python3 tests/cluster_policy.py ROSTER.yaml <rendered.yaml
 """
+import base64
 import sys
 
 import yaml
@@ -36,6 +37,13 @@ def check(desc, ok):
 
 def of(kind):
     return [d for d in docs if d["kind"] == kind]
+
+
+def site_value(cm, key):
+    # A ConfigMap key from data, or decoded from binaryData (Site Config).
+    if key in cm.get("data", {}):
+        return cm["data"][key]
+    return base64.b64decode(cm.get("binaryData", {}).get(key, "")).decode(errors="replace")
 
 
 def named(kind, name):
@@ -67,12 +75,13 @@ if roster:
     check("every Gateway listener admits only Routes from its own namespace",
           bool(lis) and all(l.get("allowedRoutes", {}).get("namespaces", {}).get("from") == "Same" for l in lis))
     want_addr = inputs.get("gatewayAddress")
+    want_addr = None if want_addr in (None, "", "none") else want_addr
     addrs = (gw or {}).get("spec", {}).get("addresses")
     if want_addr:
         check(f"the Gateway's address is pinned to the Roster's gatewayAddress {want_addr}",
               addrs == [{"type": "IPAddress", "value": want_addr}])
     else:
-        check("with no gatewayAddress the Gateway pins no address", not addrs)
+        check("with no gatewayAddress (or `none`) the Gateway pins no address", not addrs)
 else:
     # A Gateway needs a listener; an invalid one would block pruning the last admin.
     check("an empty Roster renders no Gateway", gw is None)
@@ -143,7 +152,7 @@ for a in roster:
           and named("ConfigMap", "site-config") is not None)
     cm = named("ConfigMap", "site-config")
     check(f"[{n}] each mounted CA key exists in the ConfigMap and holds a certificate",
-          cm is not None and all("BEGIN CERTIFICATE" in cm["data"].get(m["subPath"], "") for m in ca))
+          cm is not None and all("BEGIN CERTIFICATE" in site_value(cm, m["subPath"]) for m in ca))
 
     # Resources, with the Roster's overrides
     want = {k: {**DEFAULT_RESOURCES[k], **a.get("resources", {}).get(k, {})} for k in DEFAULT_RESOURCES}
