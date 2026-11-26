@@ -1,0 +1,11 @@
+# Fixture for tests/update-pins.py: a pin file the recorded run rewrites.
+editorconfig.editorconfig@0.18.2
+exiasr.hadolint@1.3.0
+gitlab.gitlab-workflow@7.7.1
+hashicorp.hcl@0.6.0
+hashicorp.terraform@2.40.1
+ms-kubernetes-tools.vscode-kubernetes-tools@1.4.1
+ms-vscode.powershell@2025.4.0
+redhat.ansible@26.11.1
+redhat.vscode-yaml@2.0.0
+timonwong.shellcheck@0.48.4

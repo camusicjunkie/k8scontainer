@@ -1,0 +1,146 @@
+{
+ "results": [
+  {
+   "extensions": [
+    {
+     "publisher": {
+      "publisherName": "HashiCorp"
+     },
+     "extensionName": "terraform",
+     "versions": [
+      {
+       "version": "2.40.1",
+       "targetPlatform": "linux-armhf",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.92.2"
+        }
+       ]
+      },
+      {
+       "version": "2.40.1",
+       "targetPlatform": "linux-x64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.92.2"
+        }
+       ]
+      },
+      {
+       "version": "2.40.1",
+       "targetPlatform": "win32-arm64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.92.2"
+        }
+       ]
+      },
+      {
+       "version": "2.40.1",
+       "targetPlatform": "darwin-x64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.92.2"
+        }
+       ]
+      },
+      {
+       "version": "2.40.1",
+       "targetPlatform": "linux-arm64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.92.2"
+        }
+       ]
+      },
+      {
+       "version": "2.40.1",
+       "targetPlatform": "web",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.92.2"
+        }
+       ]
+      },
+      {
+       "version": "2.40.1",
+       "targetPlatform": "win32-x64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.92.2"
+        }
+       ]
+      },
+      {
+       "version": "2.40.1",
+       "targetPlatform": "darwin-arm64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.92.2"
+        }
+       ]
+      },
+      {
+       "version": "2.40.0",
+       "targetPlatform": "linux-armhf",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.92.2"
+        }
+       ]
+      },
+      {
+       "version": "2.40.0",
+       "targetPlatform": "darwin-x64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.92.2"
+        }
+       ]
+      },
+      {
+       "version": "2.40.0",
+       "targetPlatform": "darwin-arm64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.92.2"
+        }
+       ]
+      },
+      {
+       "version": "2.40.0",
+       "targetPlatform": "win32-x64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.92.2"
+        }
+       ]
+      },
+      {
+       "version": "2.40.0",
+       "targetPlatform": "linux-x64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.92.2"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

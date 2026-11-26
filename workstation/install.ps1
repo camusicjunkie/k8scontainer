@@ -5,7 +5,8 @@ Remote-SSH at your Devcontainer Pod.
 
 .DESCRIPTION
 Checks every file against SHA256SUMS before writing anything, checks the
-portable VS Code is the commit pinned in the image (vscode.env), then unzips it
+portable VS Code is the commit pinned in the image (vscode.env) and the
+Remote-SSH VSIX the version pinned there, then unzips it
 into its own per-Release folder under -Destination, makes it portable (data\ and
 data\tmp), installs the Remote-SSH extension from its VSIX file, writes the
 offline settings, and adds a Host block (the Gateway host and your port) to your
@@ -110,6 +111,9 @@ if ((Get-Sha (Join-Path $here $release.vscode.zip)) -ne $pin['VSCODE_WIN_SHA256'
 $extensions = @($release.extensions)
 if ($extensions.Count -ne 1 -or $extensions[0].id -ne 'ms-vscode-remote.remote-ssh') {
     throw 'This Release must carry exactly one extension, Remote-SSH (ms-vscode-remote.remote-ssh).'
+}
+if ($extensions[0].version -ne $pin['VSCODE_REMOTE_SSH_VERSION']) {
+    throw "Remote-SSH $($extensions[0].version) is not the pinned $($pin['VSCODE_REMOTE_SSH_VERSION']) (VSCODE_REMOTE_SSH_VERSION in vscode.env)."
 }
 Assert-Covered $extensions[0].file
 

@@ -7,7 +7,8 @@ Reads files only, so it needs no Docker, cluster or network. Checks:
   1. every Pod-side path the image uses is one the Pod provides (a mount, under
      a mount, or a parent of one) or one the image ships itself;
   2. every base image in image/Dockerfile is pinned by digest, and every stage
-     but the hadolint and brew builders is on the DHI base;
+     but the hadolint and brew builders is on the DHI base, and every build
+     arg (each downloaded tool's version and SHA-256) is given its value once;
   3. no GLOSSARY.md _Avoid_ term in code comments;
   4. no resolved ticket has an acceptance item left open without `[unverified]`.
 """
@@ -81,6 +82,11 @@ check("DHI_BASE is the DHI debian-base", args.get("DHI_BASE", "").startswith("dh
 BUILDERS = {"HADOLINT_IMAGE": "hadolint", "BREW_IMAGE": "brew"}
 off_dhi = [f"{stage or 'final'} on {a}" for a, stage in bases if a != "DHI_BASE" and BUILDERS.get(a) != stage]
 check("every stage but the hadolint and brew builders is on DHI_BASE", not off_dhi, ", ".join(off_dhi))
+# A pin given a value in two stages lets a bump change one: the downloads stage
+# then fetched one Codex while the final stage's MANIFEST named another.
+valued = re.findall(r"^ARG (\w+)=", dockerfile, re.M)
+twice = sorted({a for a in valued if valued.count(a) > 1})
+check("every build arg in image/Dockerfile is given its value once", not twice, ", ".join(twice))
 
 # 3. Glossary terms in code comments. A term counts only standing alone, so tool
 # and file names that embed it (ansible-vault, devc-vault-pass, ~/.secrets/vault)

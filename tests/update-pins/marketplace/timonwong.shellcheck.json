@@ -1,0 +1,194 @@
+{
+ "results": [
+  {
+   "extensions": [
+    {
+     "publisher": {
+      "publisherName": "timonwong"
+     },
+     "extensionName": "shellcheck",
+     "versions": [
+      {
+       "version": "0.48.4",
+       "targetPlatform": "linux-x64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.101.0"
+        }
+       ]
+      },
+      {
+       "version": "0.48.4",
+       "targetPlatform": "alpine-arm64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.101.0"
+        }
+       ]
+      },
+      {
+       "version": "0.48.4",
+       "targetPlatform": "linux-arm64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.101.0"
+        }
+       ]
+      },
+      {
+       "version": "0.48.4",
+       "targetPlatform": "linux-armhf",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.101.0"
+        }
+       ]
+      },
+      {
+       "version": "0.48.4",
+       "targetPlatform": "darwin-x64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.101.0"
+        }
+       ]
+      },
+      {
+       "version": "0.48.4",
+       "targetPlatform": "alpine-x64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.101.0"
+        }
+       ]
+      },
+      {
+       "version": "0.48.4",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.101.0"
+        }
+       ]
+      },
+      {
+       "version": "0.48.4",
+       "targetPlatform": "win32-arm64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.101.0"
+        }
+       ]
+      },
+      {
+       "version": "0.48.4",
+       "targetPlatform": "darwin-arm64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.101.0"
+        }
+       ]
+      },
+      {
+       "version": "0.48.4",
+       "targetPlatform": "win32-x64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.101.0"
+        }
+       ]
+      },
+      {
+       "version": "0.48.3",
+       "targetPlatform": "alpine-arm64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.101.0"
+        }
+       ]
+      },
+      {
+       "version": "0.48.3",
+       "targetPlatform": "darwin-x64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.101.0"
+        }
+       ]
+      },
+      {
+       "version": "0.48.3",
+       "targetPlatform": "linux-x64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.101.0"
+        }
+       ]
+      },
+      {
+       "version": "0.48.3",
+       "targetPlatform": "win32-arm64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.101.0"
+        }
+       ]
+      },
+      {
+       "version": "0.48.3",
+       "targetPlatform": "darwin-arm64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.101.0"
+        }
+       ]
+      },
+      {
+       "version": "0.48.3",
+       "targetPlatform": "alpine-x64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.101.0"
+        }
+       ]
+      },
+      {
+       "version": "0.48.3",
+       "targetPlatform": "linux-arm64",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.101.0"
+        }
+       ]
+      },
+      {
+       "version": "0.48.3",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.101.0"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

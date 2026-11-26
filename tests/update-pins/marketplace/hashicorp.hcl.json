@@ -1,0 +1,114 @@
+{
+ "results": [
+  {
+   "extensions": [
+    {
+     "publisher": {
+      "publisherName": "HashiCorp"
+     },
+     "extensionName": "HCL",
+     "versions": [
+      {
+       "version": "0.6.0",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.61.0"
+        }
+       ]
+      },
+      {
+       "version": "0.5.0",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.61.0"
+        }
+       ]
+      },
+      {
+       "version": "0.4.0",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.61.0"
+        }
+       ]
+      },
+      {
+       "version": "0.3.2",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.61.0"
+        }
+       ]
+      },
+      {
+       "version": "0.3.1",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.61.0"
+        }
+       ]
+      },
+      {
+       "version": "0.3.0",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.61.0"
+        }
+       ]
+      },
+      {
+       "version": "0.2.1",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.61.0"
+        }
+       ]
+      },
+      {
+       "version": "0.2.0",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.61.0"
+        }
+       ]
+      },
+      {
+       "version": "0.1.1",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.61.0"
+        }
+       ]
+      },
+      {
+       "version": "0.1.0",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.61.0"
+        }
+       ]
+      },
+      {
+       "version": "0.0.5",
+       "properties": []
+      },
+      {
+       "version": "0.0.4",
+       "properties": []
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
