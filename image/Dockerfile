@@ -7,6 +7,14 @@
 ARG DHI_BASE=dhi.io/debian-base:trixie-dev@sha256:f90fd43cdf3dd94840b4dc3a2a39fd2a08578e40e7895535e2e20a1275ba6013
 ARG BREW_IMAGE=docker.io/homebrew/brew:4.6.20@sha256:b0072bfdebf5934ae24b93b44a1928a88057399b3283ffa0177bb86084fdedfd
 ARG HADOLINT_IMAGE=docker.io/hadolint/hadolint:v2.15.1-debian@sha256:9a3944b7fddcb947d1ffd90829ac1a6e5c30479223358f249d8b96c7d0019e27
+# The downloaded tools, each with the SHA-256 of its release asset. A stage
+# reads one with a bare `ARG <name>`, so its value is given here only.
+ARG CODEX_VERSION=0.162.0
+ARG CODEX_SHA256=8daf67f6261161aa5939d8d42a516032d760406216779d7ce6040f242140ff73
+ARG TFLINT_VERSION=0.64.0
+ARG TFLINT_SHA256=cca9d13e2e1d7a2c627af60ff899a3c9b74212899416aeb96ec764d2ef954537
+ARG PWSH_VERSION=7.6.6
+ARG PWSH_SHA256=ddbc4a2d113bbd46d283cfedcbcd117a70caefd7673f41f2b4e0000badf103bc
 
 # ------------------------------------------------------------------ hadolint
 # Its static binary. Brew's build needs brew's gmp and libffi, and apt has none.
@@ -36,12 +44,12 @@ RUN --mount=type=bind,source=build,target=/tmp/build \
 # ------------------------------------------------------------------ downloads
 # Pinned upstream binaries, each checked against its SHA-256.
 FROM ${DHI_BASE} AS downloads
-ARG CODEX_VERSION=0.162.0
-ARG CODEX_SHA256=8daf67f6261161aa5939d8d42a516032d760406216779d7ce6040f242140ff73
-ARG TFLINT_VERSION=0.64.0
-ARG TFLINT_SHA256=cca9d13e2e1d7a2c627af60ff899a3c9b74212899416aeb96ec764d2ef954537
-ARG PWSH_VERSION=7.6.6
-ARG PWSH_SHA256=ddbc4a2d113bbd46d283cfedcbcd117a70caefd7673f41f2b4e0000badf103bc
+ARG CODEX_VERSION
+ARG CODEX_SHA256
+ARG TFLINT_VERSION
+ARG TFLINT_SHA256
+ARG PWSH_VERSION
+ARG PWSH_SHA256
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # hadolint ignore=DL3008
 RUN apt-get update \
@@ -190,9 +198,9 @@ FROM ${DHI_BASE}
 ARG DHI_BASE
 ARG DEVC_VERSION=0.0.0-local
 ARG DEVC_GIT_SHA=local
-ARG CODEX_VERSION=0.162.0
-ARG TFLINT_VERSION=0.64.0
-ARG PWSH_VERSION=7.6.6
+ARG CODEX_VERSION
+ARG TFLINT_VERSION
+ARG PWSH_VERSION
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
