@@ -137,7 +137,7 @@ Flux applies [`manifests/devcontainer/`](manifests/devcontainer/kustomization.ya
 | File | Object | Role |
 |---|---|---|
 | `site-config.yaml` | ConfigMap `site-config` | the network's Site Config, from runtime facts: `site.env` (`KLOGIN_SERVERS`, `KLOGIN_NAMESPACES`, `KLOGIN_CLUSTERS`, and `AI_GATEWAY_URL` where the site has one) and `site-ca.crt`. |
-| `roster.yaml` | ResourceSetInputProvider `roster` (Static) | the Roster: the Standard Image every Pod runs, as `imageRepository` (the network's Registry, from runtime facts) and `imageTag` (the one value the image automation rewrites), `gatewayAddress` for the shared Gateway (from runtime facts; empty, the load balancer picks), an optional `storageClass` for every volume (left out, the cluster's default class), and the `admins` list (`name`, `port`, `publicKey`, optional `resources`). |
+| `roster.yaml` | ResourceSetInputProvider `roster` (Static) | the Roster: the Standard Image every Pod runs, as `imageRepository` (the network's Registry, from runtime facts) and `imageTag` (the one value the image automation rewrites), `gatewayAddress` for the shared Gateway (from runtime facts; `none`, the default, lets the load balancer pick), an optional `storageClass` for every volume (left out, the cluster's default class), and the `admins` list (`name`, `port`, `publicKey`, optional `resources`). |
 | `image-automation.yaml` | ImageRepository and ImagePolicy `devcontainer-standard` | scan the Registry every 5 minutes, trusting `harbor-ca` and logging in with `harbor-pull`, and pick the newest Release tag (`semver ">=0.1.0"`, never a pre-release). |
 | `networkpolicy.yaml` | NetworkPolicy `devcontainer-pods` | SSH into a Pod only from the shared Gateway; egress to DNS and outside the cluster's Pod network, never to other Pods. |
 | `resourceset.yaml` | ResourceSet `devcontainer` | renders everything below from the Roster. |
@@ -178,7 +178,7 @@ Every network-specific value is a Flux variable that the syncing Kustomization s
 | `HARBOR_REGISTRY`, `HARBOR_PROJECT` | the Roster's `imageRepository` and the ImageRepository: `<registry>/<project>/devcontainer/standard` | `harbor_registry`, `harbor_project` |
 | `DEVCONTAINER_SITE_ENV_B64` | Site Config's `site.env`, base64 | `devcontainer_site_env` (a map) |
 | `DEVCONTAINER_SITE_CA_B64` | Site Config's `site-ca.crt`, base64 | `devcontainer_site_ca` (default: `harbor_ca`) |
-| `DEVCONTAINER_GATEWAY_ADDRESS` | the Roster's `gatewayAddress`; default empty | `devcontainer_gateway_address` |
+| `DEVCONTAINER_GATEWAY_ADDRESS` | the Roster's `gatewayAddress`; default `none` | `devcontainer_gateway_address` |
 | `DEVCONTAINER_POD_CIDR` | the Pod network the NetworkPolicy keeps Pods from; default `192.168.0.0/16`, VKS's | `devcontainer_pod_cidr` |
 
 Write a new one as a variable here, add it to `tests/site/facts.env` and this table, and add it to the Gitops repository's bootstrap in the same change.

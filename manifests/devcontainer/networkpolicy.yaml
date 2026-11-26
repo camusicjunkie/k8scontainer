@@ -5,7 +5,10 @@
 #   (Supervisors, vCenter, GitLab, Harbor, the hosts admins manage), but never
 #   to other Pods. sshd allows TCP forwarding (Remote-SSH needs it), so without
 #   this an admin's session would be a way into the Management Cluster's own
-#   workloads.
+#   workloads. It isolates Pods only: the nodes, the kubelet and the API
+#   server's addresses are outside the Pod network and stay reachable. The Pod
+#   mounts no ServiceAccount token, so the API grants it nothing; an admin who
+#   brings their own credentials can use any cluster, this one included.
 # The Pod CIDR is the one per-network value, from the network's runtime facts
 # (DEVCONTAINER_POD_CIDR); without it, VKS's default 192.168.0.0/16. Kubelet probes come from
 # the node, not a Pod, and the readiness probe is an exec anyway.
