@@ -30,7 +30,11 @@
 #   VSPHERE_PLUGIN_SHA256  that Supervisor's vsphere-plugin.zip SHA-256,
 #                    required with SUPERVISOR_HOST
 # Protect the Release tag pattern so only the Release Owner can create it. The
-# project's Container Registry holds a `candidate` image per commit.
+# project's Container Registry holds a `candidate` image per pipeline: tagged
+# <commit>-<pipeline id>, so a branch pipeline and a tag pipeline on the same
+# commit (merge, then tag) never overwrite each other's candidate, and publish
+# copies the image its own self-test passed. Credentials go in on stdin, never
+# on a command line.
 
 workflow:
   rules:
@@ -43,7 +47,7 @@ workflow:
 stages: [build, test, publish]
 
 variables:
-  CANDIDATE: $CI_REGISTRY_IMAGE/candidate:$CI_COMMIT_SHA
+  CANDIDATE: $CI_REGISTRY_IMAGE/candidate:$CI_COMMIT_SHA-$CI_PIPELINE_ID
 
 # The repo's file checks (tests/all.sh --files): the pipeline's own rules, the
 # contracts between image and manifests, and the docs. No image needed, so it
@@ -75,7 +79,7 @@ build:
       --build-arg "SUPERVISOR_HOST=${SUPERVISOR_HOST:-}"
       --build-arg "VSPHERE_PLUGIN_SHA256=${VSPHERE_PLUGIN_SHA256:-}"
       --tag "$CANDIDATE" image
-    - buildah login --username "$CI_REGISTRY_USER" --password "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - printf '%s' "$CI_REGISTRY_PASSWORD" | buildah login --username "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - buildah push "$CANDIDATE" "docker://$CANDIDATE"
 
 selftest:
@@ -86,7 +90,7 @@ selftest:
     STORAGE_DRIVER: vfs
     BUILDAH_ISOLATION: rootless
   script:
-    - buildah login --username "$CI_REGISTRY_USER" --password "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - printf '%s' "$CI_REGISTRY_PASSWORD" | buildah login --username "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - ctr=$(buildah from "docker://$CANDIDATE")
     - buildah run --network none "$ctr" -- devc-selftest
 
@@ -99,8 +103,6 @@ publish:
   rules:
     - if: $CI_COMMIT_TAG =~ /^v?\d+\.\d+\.\d+$/
   script:
-    - >
-      skopeo copy --all
-      --src-creds "$CI_REGISTRY_USER:$CI_REGISTRY_PASSWORD"
-      --dest-creds "$HARBOR_USER:$HARBOR_PASSWORD"
-      "docker://$CANDIDATE" "docker://$HARBOR_IMAGE:$CI_COMMIT_TAG"
+    - printf '%s' "$CI_REGISTRY_PASSWORD" | skopeo login --username "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - printf '%s' "$HARBOR_PASSWORD" | skopeo login --username "$HARBOR_USER" --password-stdin "${HARBOR_IMAGE%%/*}"
+    - skopeo copy --all "docker://$CANDIDATE" "docker://$HARBOR_IMAGE:$CI_COMMIT_TAG"
