@@ -37,6 +37,14 @@ spec:
       namespace: devcontainer
     spec:
       gatewayClassName: istio
+      # The Roster's gatewayAddress, when set, pins the LoadBalancer IP, so the
+      # address in every Workstation's SSH config survives the Gateway being
+      # recreated. Left out, the load balancer picks one.
+      <<- with get inputs "gatewayAddress" >>
+      addresses:
+        - type: IPAddress
+          value: << . >>
+      <<- end >>
       # Istio merges this ConfigMap into the gateway Deployment it generates
       # (gateway-options.yaml), so the gateway Pod passes Pod Security.
       infrastructure:
@@ -152,10 +160,11 @@ spec:
               type: RuntimeDefault
           containers:
             - name: devcontainer
-              # One image for every admin, set in the Roster (the marked line
-              # the image automation rewrites). OnDelete means a new value
-              # reaches a Pod only when its admin restarts it.
-              image: << inputs.image >>
+              # One image for every admin, set in the Roster: the site's
+              # Registry repository and the tag the image automation rewrites.
+              # OnDelete means a new tag reaches a Pod only when its admin
+              # restarts it.
+              image: << inputs.imageRepository >>:<< inputs.imageTag >>
               imagePullPolicy: IfNotPresent
               ports:
                 - name: ssh
@@ -172,9 +181,13 @@ spec:
                 limits:
                   cpu: << dig "resources" "limits" "cpu" "2" $a | quote >>
                   memory: << dig "resources" "limits" "memory" "4Gi" $a | quote >>
+              # Ready once sshd listens: devc-sshd's pid file names a live
+              # process. Not tcpSocket, which sshd logs as a pre-auth
+              # disconnect on every probe.
               readinessProbe:
-                tcpSocket:
-                  port: ssh
+                exec:
+                  command: ["bash", "-c", 'kill -0 "$(cat /tmp/devc-sshd-2222.pid)"']
+                periodSeconds: 10
               volumeMounts:
                 - { name: state, mountPath: /home/dev/workspace, subPath: workspace }
                 - { name: state, mountPath: /home/dev/.kube, subPath: .kube }

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Cluster seam, policy half: reads the rendered manifests (YAML on stdin) and
-checks what the Management Cluster would enforce on them. Stands in for the
-Gitops repository's Kyverno policies, which are not available here: it asserts
-the Pod Security `restricted` fields (Kubernetes 1.31 profile) and the
-tickets' behaviours.
+checks what the Management Cluster would enforce on them. The Management
+Cluster runs no Kyverno, so that is Pod Security admission: it asserts the Pod
+Security `restricted` fields (Kubernetes 1.31 profile) and the tickets'
+behaviours.
 
 The input is the Namespace and Site Config (`kubectl kustomize
 manifests/devcontainer`) followed by what the ResourceSet generates for a
@@ -66,6 +66,13 @@ if roster:
           sorted(l["port"] for l in lis) == sorted(ports) and len(lis) == len(gw["spec"]["listeners"]))
     check("every Gateway listener admits only Routes from its own namespace",
           bool(lis) and all(l.get("allowedRoutes", {}).get("namespaces", {}).get("from") == "Same" for l in lis))
+    want_addr = inputs.get("gatewayAddress")
+    addrs = (gw or {}).get("spec", {}).get("addresses")
+    if want_addr:
+        check(f"the Gateway's address is pinned to the Roster's gatewayAddress {want_addr}",
+              addrs == [{"type": "IPAddress", "value": want_addr}])
+    else:
+        check("with no gatewayAddress the Gateway pins no address", not addrs)
 else:
     # A Gateway needs a listener; an invalid one would block pruning the last admin.
     check("an empty Roster renders no Gateway", gw is None)
@@ -109,6 +116,9 @@ for a in roster:
     check(f"[{n}] the Pod has no Kubernetes API credentials", pod.get("automountServiceAccountToken") is False)
     check(f"[{n}] pod fsGroup lets uid 1000 write the volume", psc.get("fsGroup") == 1000)
     check(f"[{n}] sshd port 2222 is exposed", any(p["containerPort"] == 2222 for p in c.get("ports", [])))
+    probe = c.get("readinessProbe", {})
+    check(f"[{n}] readiness reads sshd's pid file for port 2222 (an exec, not a TCP connection sshd would log)",
+          "tcpSocket" not in probe and "/tmp/devc-sshd-2222.pid" in " ".join(probe.get("exec", {}).get("command", [])))
 
     # Volume layout
     claims = {t["metadata"]["name"]: t for t in spec.get("volumeClaimTemplates", [])}
@@ -202,5 +212,25 @@ for n, p in per_admin.items():
                                             for m in per_admin for a2 in roster if a2["name"] == m))
     other_kcm = [named("ConfigMap", q["kcm"]) for q in others]
     check(f"[{n}] its key is not in any other admin's key list", all(own_pub not in str(k) for k in other_kcm))
+
+# NetworkPolicy: every Devcontainer Pod is selected; ingress only from the
+# shared Gateway's Pod on sshd's port; egress to DNS and outside the Pod network.
+pols = of("NetworkPolicy")
+sel = {"app.kubernetes.io/name": "devcontainer"}
+pol = next((q for q in pols if q["spec"].get("podSelector", {}).get("matchLabels") == sel), None)
+check("a NetworkPolicy selects every Devcontainer Pod, for ingress and egress",
+      pol is not None and set(pol["spec"].get("policyTypes", [])) == {"Ingress", "Egress"}
+      and all(sel.items() <= s_["spec"]["template"]["metadata"]["labels"].items() for s_ in sts_all))
+if pol:
+    ing = pol["spec"].get("ingress", [])
+    check("ingress comes only from the shared Gateway's Pod, on port 2222",
+          len(ing) == 1 and ing[0].get("from") == [{"podSelector": {"matchLabels": {"gateway.networking.k8s.io/gateway-name": "devcontainer"}}}]
+          and ing[0].get("ports") == [{"port": 2222, "protocol": "TCP"}])
+    blocks = [t["ipBlock"] for r in pol["spec"].get("egress", []) for t in r.get("to", []) if "ipBlock" in t]
+    check("egress to addresses outside the cluster excludes the Pod network (no tunnelling into other Pods)",
+          len(blocks) == 1 and blocks[0]["cidr"] == "0.0.0.0/0" and len(blocks[0].get("except", [])) == 1)
+    dns = [r for r in pol["spec"].get("egress", []) if any("podSelector" in t for t in r.get("to", []))]
+    check("egress to other Pods is only cluster DNS on port 53",
+          len(dns) == 1 and {p_["port"] for p_ in dns[0].get("ports", [])} == {53})
 
 sys.exit(1 if failed else 0)

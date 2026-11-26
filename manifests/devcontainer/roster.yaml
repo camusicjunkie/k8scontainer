@@ -9,8 +9,13 @@
 #   resources  optional overrides of the Pod's requests and limits
 #              (any of requests.cpu, requests.memory, limits.cpu, limits.memory)
 #
-# storageClass (optional, beside image) names the StorageClass of every admin's
-# volume; without it each claim takes the cluster's default class.
+# storageClass (optional, beside imageTag) names the StorageClass of every admin's
+# volume; without it each claim takes the cluster's default class. Set it once,
+# before the first admin: a StatefulSet's claim template can't change, so a
+# later change stops the ResourceSet applying for every admin (admin guide).
+#
+# gatewayAddress (optional) pins the shared Gateway's IP. Each network's
+# Kustomization patches its own in; leave it out here.
 #
 # A Static ResourceSetInputProvider keeps the Roster a plain file: its
 # defaultValues are the single input set the ResourceSet renders from.
@@ -22,10 +27,16 @@ metadata:
 spec:
   type: Static
   defaultValues:
-    # The Standard Image every Pod runs. The marker comment is the setter the
-    # existing image automation rewrites to the newest Release tag chosen by
-    # ImagePolicy devcontainer/devcontainer-standard (image-automation.yaml).
-    image: harbor.example/devcontainer/standard:0.1.0 # {"$imagepolicy": "devcontainer:devcontainer-standard"}
+    # The Standard Image every Pod runs, in two parts so that no network's
+    # Registry host is ever committed. imageRepository is a placeholder: the
+    # Kustomization that syncs this directory patches in the network's Registry
+    # (the Gitops repository does, from its runtime facts). imageTag is the one
+    # value the image automation rewrites, to the newest Release tag chosen by
+    # ImagePolicy devcontainer/devcontainer-standard (image-automation.yaml);
+    # Release tags are the same on every network, so this line never conflicts
+    # when the repository is carried to another one.
+    imageRepository: harbor.example/devcontainer/standard
+    imageTag: 0.1.0 # {"$imagepolicy": "devcontainer:devcontainer-standard:tag"}
     admins:
       - name: admin
         port: 2201
