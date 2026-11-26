@@ -24,14 +24,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 REC = ROOT / "tests/update-pins"
-PINS = {"vscode.env": "image/packages/vscode.env",
-        "vscode-extensions.txt": "image/packages/vscode-extensions.txt",
-        "Dockerfile": "image/Dockerfile"}
-
 sys.dont_write_bytecode = True   # no release/__pycache__ left in the checkout
 spec = importlib.util.spec_from_file_location("update_pins", ROOT / "release/update-pins.py")
 update_pins = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(update_pins)
+
+# The fixtures in before/ and after/ by file name, and where the script reads each.
+PINS = {Path(rel).name: rel for rel in (update_pins.VSCODE_ENV, update_pins.EXTENSIONS, update_pins.DOCKERFILE)}
 
 
 class Upstream:

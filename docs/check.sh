@@ -65,6 +65,10 @@ names=$("$py" -I tests/site/subst.py --names | tr -d '\r') || bad "tests/site/su
 for name in $names; do
     grep -q "\`$name\`" README.md || bad "README doesn't name runtime fact $name (tests/site/facts.env)"
 done
+# The Release Owner guide lists the pin updater's groups as release/update-pins.py --help does.
+groups=$("$py" -I release/update-pins.py --help | sed -n 's/^Groups: //p' | tr -d '\r')
+[[ -n $groups ]] && grep -qF "$(sed 's/[a-z]\+/`&`/g' <<<"$groups")" docs/release-owner-guide.md \
+    || bad "the Release Owner guide's list of update-pins groups differs from release/update-pins.py --help ($groups)"
 # Personal Config: the bashrc the image sources is on the path the Pod mounts.
 grep -q 'mountPath: /home/dev/.devc/personal' manifests/devcontainer/resourceset.yaml || bad "Pod does not mount Personal Config at ~/.devc/personal"
 grep -q '\$HOME/.devc/personal/bashrc' image/rootfs/etc/bash.bashrc.d/99-personal.sh || bad "99-personal.sh does not read ~/.devc/personal/bashrc"
