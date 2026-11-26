@@ -6,12 +6,11 @@ with no value and no default fails.
     python3 tests/site/subst.py <in.yaml >out.yaml   # substitute
     python3 tests/site/subst.py --names              # the contract's names
 
-Values come from facts.env beside this file; set NAME in the environment to
-override one. DEVCONTAINER_SITE_ENV_B64 and DEVCONTAINER_SITE_CA_B64 are
-computed from site.env and site-ca.crt unless overridden.
+Values come from facts.env beside this file, the one parser of it (tests/repo.py
+and docs/check.sh read the names through --names). DEVCONTAINER_SITE_ENV_B64
+and DEVCONTAINER_SITE_CA_B64 are computed from site.env and site-ca.crt.
 """
 import base64
-import os
 import re
 import sys
 from pathlib import Path
@@ -28,9 +27,6 @@ def facts():
             out[k.strip()] = v.strip()
     out["DEVCONTAINER_SITE_ENV_B64"] = base64.b64encode((HERE / "site.env").read_bytes()).decode()
     out["DEVCONTAINER_SITE_CA_B64"] = base64.b64encode((HERE / "site-ca.crt").read_bytes()).decode()
-    for k in out:
-        if k in os.environ:
-            out[k] = os.environ[k]
     return out
 
 

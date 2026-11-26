@@ -12,6 +12,7 @@ Reads files only, so it needs no Docker, cluster or network. Checks:
   4. no resolved ticket has an acceptance item left open without `[unverified]`.
 """
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -110,8 +111,8 @@ check(f"no GLOSSARY _Avoid_ term in code comments ({', '.join(avoid)})", not hit
 # contract in tests/site/facts.env, which the Gitops repository's bootstrap
 # writes into flux-runtime-info. With strict substitution, a variable missing
 # there fails the sync; one listed but unused is a stale contract.
-contract = {l.split("=", 1)[0].strip() for l in text(ROOT / "tests/site/facts.env").splitlines()
-            if l.strip() and not l.lstrip().startswith("#")}
+contract = set(subprocess.run([sys.executable, "-I", str(ROOT / "tests/site/subst.py"), "--names"],
+                              capture_output=True, text=True, check=True).stdout.split())
 used = set()
 for p in files("manifests/**/*.yaml"):
     used |= set(re.findall(r"\$\{([A-Za-z_][A-Za-z0-9_]*)", text(p)))

@@ -60,10 +60,11 @@ grep -q 'ms-vscode-remote.remote-ssh' workstation/install.ps1 || bad "Remote-SSH
 grep -q 'state-devc\|name: state' manifests/devcontainer/resourceset.yaml || bad "volume claim name differs"
 grep -q 'DEVC_UNLOCK_KEY' image/rootfs/usr/local/lib/devc/secrets.bash || bad "DEVC_UNLOCK_KEY missing"
 # The runtime-facts contract: the README names every variable in tests/site/facts.env.
-while IFS='=' read -r name _; do
-    [[ -z $name || $name == \#* ]] && continue
+py=python3; python3 -c "" >/dev/null 2>&1 || py=python
+names=$("$py" -I tests/site/subst.py --names | tr -d '\r') || bad "tests/site/subst.py --names failed"
+for name in $names; do
     grep -q "\`$name\`" README.md || bad "README doesn't name runtime fact $name (tests/site/facts.env)"
-done <tests/site/facts.env
+done
 # Personal Config: the bashrc the image sources is on the path the Pod mounts.
 grep -q 'mountPath: /home/dev/.devc/personal' manifests/devcontainer/resourceset.yaml || bad "Pod does not mount Personal Config at ~/.devc/personal"
 grep -q '\$HOME/.devc/personal/bashrc' image/rootfs/etc/bash.bashrc.d/99-personal.sh || bad "99-personal.sh does not read ~/.devc/personal/bashrc"
