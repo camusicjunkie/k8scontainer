@@ -64,6 +64,7 @@ checks:
 # not installed; here each runs from its own image, so CI never skips them.
 # hadolint is the image the Dockerfile's HADOLINT_IMAGE pins (tests/ci.py
 # checks they match): older releases reject its ADD --checksum.
+# release/update-pins.py moves both images (its hadolint and shellcheck groups).
 shellcheck:
   stage: test
   needs: []

@@ -30,7 +30,10 @@ update_pins = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(update_pins)
 
 # The fixtures in before/ and after/ by file name, and where the script reads each.
-PINS = {Path(rel).name: rel for rel in (update_pins.VSCODE_ENV, update_pins.EXTENSIONS, update_pins.DOCKERFILE)}
+PINS = {Path(rel).name: rel for rel in (update_pins.VSCODE_ENV, update_pins.EXTENSIONS, update_pins.DOCKERFILE,
+                                        update_pins.PIPELINE)}
+HADOLINT_2_14 = "docker.io/hadolint/hadolint:v2.14.0-debian@sha256:158cd0184dcaa18bd8ec20b61f4c1cabdf8b32a592d062f57bdcb8e4c1d312e2"
+HADOLINT_2_15 = "docker.io/hadolint/hadolint:v2.15.1-debian@sha256:9a3944b7fddcb947d1ffd90829ac1a6e5c30479223358f249d8b96c7d0019e27"
 
 
 class Upstream:
@@ -111,6 +114,8 @@ class PinUpdater(unittest.TestCase):
         self.assertNotIn("[major version]", lines["gitlab.gitlab-workflow"])
         self.assertNotIn("[major version]", lines["DHI_BASE"])
         self.assertNotIn("HADOLINT_IMAGE", lines, "an unchanged pin is not listed")
+        self.assertTrue(lines["shellcheck"].startswith("shellcheck job "), lines["shellcheck"])
+        self.assertNotIn("[major version]", lines["shellcheck"])
 
     def test_when_nothing_upstream_changed_every_file_is_left_byte_for_byte(self):
         self.place(REC / "after")
@@ -129,12 +134,36 @@ class PinUpdater(unittest.TestCase):
         self.assertEqual(code, 0, err)
         self.assertEqual(self.pin("vscode.env"), before["vscode.env"])
         self.assertEqual(self.pin("vscode-extensions.txt"), before["vscode-extensions.txt"])
+        self.assertEqual(self.pin(".gitlab-ci.yml"), before[".gitlab-ci.yml"])
         want = before["Dockerfile"].decode() \
             .replace("ARG TFLINT_VERSION=0.64.0", "ARG TFLINT_VERSION=0.66.0") \
             .replace("ARG TFLINT_SHA256=cca9d13e2e1d7a2c627af60ff899a3c9b74212899416aeb96ec764d2ef954537",
                      "ARG TFLINT_SHA256=22be11cadc25cd02401e94c0ccc91aa63467debb8485c2a755d98f4c0a9d1e2e")
         self.assertEqual(self.pin("Dockerfile").decode(), want)
         self.assertEqual([r for r in self.upstream.requests if "tflint" not in r], [], "looked up another group")
+
+    def test_the_hadolint_job_moves_with_hadolint_image(self):
+        # tests/ci.py fails the pipeline when the hadolint job's image is not HADOLINT_IMAGE's.
+        for name in ("Dockerfile", ".gitlab-ci.yml"):
+            p = self.root / PINS[name]
+            p.write_bytes(p.read_bytes().replace(HADOLINT_2_15.encode(), HADOLINT_2_14.encode()))
+        shellcheck_before = self.pin(".gitlab-ci.yml").decode().split("hadolint:")[0]
+        code, out, err = self.run_script("hadolint")
+        self.assertEqual(code, 0, err)
+        self.assertIn(f"ARG HADOLINT_IMAGE={HADOLINT_2_15}\n", self.pin("Dockerfile").decode())
+        pipeline = self.pin(".gitlab-ci.yml").decode()
+        self.assertIn(f"hadolint:\n  stage: test\n  image:\n    name: {HADOLINT_2_15}\n", pipeline)
+        self.assertEqual(pipeline.split("hadolint:")[0], shellcheck_before, "changed another job")
+        self.assertIn(f"hadolint job {HADOLINT_2_14} -> {HADOLINT_2_15}", out)
+
+    def test_a_pipeline_job_without_a_pinned_image_fails_and_names_the_job(self):
+        p = self.root / PINS[".gitlab-ci.yml"]
+        p.write_bytes(re.sub(rb"(shellcheck-alpine:v0\.10\.0)@sha256:[0-9a-f]+", rb"\1", p.read_bytes()))
+        before = {name: self.pin(name) for name in PINS}
+        code, out, err = self.run_script("shellcheck", "hadolint")
+        self.assertEqual(code, 1)
+        self.assertIn("shellcheck job", err)
+        self.assertEqual({name: self.pin(name) for name in PINS}, before)
 
     def test_extensions_alone_are_chosen_for_the_pinned_vs_code(self):
         code, out, err = self.run_script("extensions")
@@ -209,7 +238,7 @@ class PinUpdater(unittest.TestCase):
 
     def test_a_failed_lookup_writes_nothing_and_names_the_pin(self):
         for failing, pin in (("PowerShell", "PWSH_VERSION"), ("redhat.ansible", "redhat.ansible"),
-                             ("dhi.io", "DHI_BASE")):
+                             ("dhi.io", "DHI_BASE"), ("koalaman/shellcheck", "shellcheck")):
             with self.subTest(pin=pin):
                 before = {name: self.pin(name) for name in PINS}
                 code, out, err = self.run_script(upstream=Upstream(failing=[failing]))
@@ -287,6 +316,7 @@ class PinUpdater(unittest.TestCase):
         self.assertIn("VSCODE_COMMIT=661626d0e72f97806550790a98fb87116c9db825\n", env)
         self.assertIn("VSCODE_REMOTE_SSH_VERSION=0.128.0\n", env)
         self.assertIn("ARG CODEX_VERSION=0.172.0\n", self.pin("Dockerfile").decode())
+        self.assertIn("shellcheck-alpine:v0.11.0@sha256:9955be09", self.pin(".gitlab-ci.yml").decode())
 
 
 if __name__ == "__main__":
