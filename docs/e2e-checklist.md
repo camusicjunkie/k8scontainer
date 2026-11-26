@@ -2,6 +2,8 @@
 
 The manual gate for a Release. Run it on the Disconnected Side before a Release is declared good, and again whenever the VS Code commit, the Roster/ResourceSet manifests or the image automation change. `devc-selftest`, `tests/image.sh`, `tests/cluster.sh`, `tests/release.sh`, `tests/secrets-klogin.sh` and the installer's Pester tests cover the parts that need no real cluster, card or Gateway; `tests/cluster-live.sh` runs sections 2, 7, 8 and 9's cluster side on a kind cluster, but not under Istio, real Harbor or the real Management Cluster. This checklist covers what they could not: the Workstation, the Gateway, the smartcard, the Management Cluster and the Devcontainer Pod together, with no Internet. Each item names what it settles; items marked **[unverified]** are the ones the tickets recorded as never having run against the real thing.
 
+Section 10 is the exception: it runs on the Connected Side, at the start of the Release.
+
 Record the date, the Release version, who ran it, the result of every step and anything odd. A failure blocks the Release until it is fixed.
 
 ## Setup
@@ -95,6 +97,14 @@ Record the date, the Release version, who ran it, the result of every step and a
 - [ ] A Roster entry with a duplicate port is rejected or fails the ResourceSet visibly (record exactly what happens, since one bad entry affects all admins), then is reverted.
 - [ ] The Pod cannot reach the Kubernetes API with credentials (none are mounted), and A's session cannot read B's volume paths.
 - [ ] No Internet is needed anywhere above: the VS Code server, extensions and Release came from the image and the Registry.
+
+## 10. Connected Side: refreshing the pins
+
+Run at the start of the Release, on the Connected Side, before the build the sections above test.
+
+- [ ] **[unverified]** On the Connected Side's Linux Docker host, in a clone at the Release branch, `python3 release/update-pins.py` after `docker login dhi.io` refreshes every group, including `dhi`'s digest through `docker buildx imagetools inspect`, and leaves only the pin files changed in `git diff`. It has run only on a Windows development machine.
+- [ ] **[unverified]** The `dhi.io` login check matches that host: after `docker login dhi.io` (with a credential helper, if the host has one) the `dhi` group passes the check; after `docker logout dhi.io`, `python3 release/update-pins.py dhi` stops before any lookup and names `docker login dhi.io`. The check reads `auths` and `credHelpers` in `~/.docker/config.json` (or `$DOCKER_CONFIG`), on the understanding that `docker login` writes an `auths` entry even when `credsStore` keeps the secret.
+- [ ] **[unverified]** The pipeline's `build` job pulls `BREW_IMAGE` from `ghcr.io` (buildah, no login for `ghcr.io`), now that the pin has moved there from Docker Hub.
 
 ## Done
 
