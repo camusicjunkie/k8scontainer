@@ -25,7 +25,7 @@ The zip is fetched without TLS verification (Supervisors usually carry their own
 
 **Runner needs** (from `.gitlab-ci.yml`): the job container must be allowed user namespaces (seccomp must not block `unshare`) and be given a `/dev/fuse` device, because buildah overlays the build context for `RUN --mount=type=bind`. It needs neither `--privileged` nor a Docker daemon. On a GitLab docker-executor runner that is `devices = ["/dev/fuse"]` and `security_opt = ["seccomp=unconfined", "apparmor=unconfined"]` under `[runners.docker]`; under Docker's default seccomp rules buildah fails with `unshare(CLONE_NEWUSER): Operation not permitted`.
 
-**`candidate` images accumulate.** Every pipeline pushes `candidate:<commit sha>` to the project's Container Registry. Add a registry cleanup policy for that repository or it grows without bound.
+**`candidate` images accumulate.** Every pipeline pushes `candidate:<commit sha>-<pipeline id>` to the project's Container Registry. Add a registry cleanup policy for that repository or it grows without bound.
 
 **DHI login.** The DHI base's registry (`dhi.io`) needs a login: set `DHI_USER` and `DHI_PASSWORD` (masked, and raw if the token contains `$`) to a Docker account entitled to the base, and the build logs in before it pulls. Without them the build fails at the first DHI stage with `authentication required`.
 
@@ -91,16 +91,41 @@ The existence check and the push are not atomic, so do not run two imports of on
 
 The image automation on each side's Management Cluster picks the new tag up and commits it to the Roster on a push branch (`image-updates`, as the Gitops repository's own automation does). Merging that branch's merge request is what rolls the Release out; nothing restarts. Each admin restarts their own Pod when ready (see the admin guide).
 
-- `manifests/devcontainer/image-automation.yaml` ships an ImageRepository (scans the Registry every 5 minutes) and an ImagePolicy (`semver: ">=0.1.0"`, which never selects a pre-release tag). The Roster carries one marked `image:` line, `# {"$imagepolicy": "devcontainer:devcontainer-standard"}`, rendered into every admin's Pod template.
-- **The ImageUpdateAutomation is not in this repository**, because it holds Git push credentials. The Gitops repository's existing one does not cover it: that one lives in `flux-system` and updates the Gitops repository's own `./apps`. Add one in the `devcontainer` namespace (an automation applies only the ImagePolicies in its own namespace) with `update.path: ./manifests/devcontainer` and `push.branch: image-updates`. Give it its own GitRepository in that namespace with a `write_repository` token, and keep the GitRepository Flux syncs this repository from read-only. `tests/kind/flux.yaml` is a working example; the namespace exists only after the first sync, so apply the automation from a Kustomization that `dependsOn` the one syncing this repository. If the Registry needs a pull credential, add `secretRef` to the ImageRepository (a Secret supplied outside Git).
-- **Harbor's CA for the scanner.** A Harbor whose certificate comes from a private CA (a Supervisor service's, for one) is trusted by the cluster's nodes, but not by the image-reflector-controller, which runs in a Pod with its own CA bundle. Patch `certSecretRef: {name: harbor-ca}` onto the ImageRepository from the Kustomization that syncs this repository, and have a `harbor-ca` Secret (key `ca.crt`) in the `devcontainer` namespace; the Gitops repository's Kyverno policy that copies `harbor-pull` into each namespace can copy it too.
-- The placeholder host `harbor.example` in the ImageRepository and the Roster must be replaced with each network's Registry. The Gitops repository's Kyverno policy rewrites every Pod image not already on `${HARBOR_REGISTRY}` to `${HARBOR_REGISTRY}/${HARBOR_PROJECT}/devcontainer/<name:tag>`, so publish to that path (`HARBOR_IMAGE`) and point the ImageRepository at it; the automation then writes that same path into the Roster and the rewrite leaves it alone.
+- `manifests/devcontainer/image-automation.yaml` ships an ImageRepository (scans the Registry every 5 minutes) and an ImagePolicy (`semver: ">=0.1.0"`, which never selects a pre-release tag). The Roster carries the image in two parts: `imageRepository`, a placeholder each network's Kustomization patches with its Registry, and `imageTag`, marked `# {"$imagepolicy": "devcontainer:devcontainer-standard:tag"}`. The automation rewrites only the tag, so no Registry host is ever committed, and the same Release tag on both networks means the line never conflicts.
+- **The ImageUpdateAutomation is not in this repository**, because it holds Git push credentials. The Gitops repository's `clusters/management/devcontainer.yaml` runs it in the `devcontainer` namespace (an automation applies only the ImagePolicies in its own namespace), with `update.path: ./manifests/devcontainer`, `push.branch: image-updates` and its own `write_repository` token, beside the read-only GitRepository Flux syncs this repository from. `tests/kind/flux.yaml` is a smaller working example.
+- **Harbor's CA for the scanner.** A Harbor whose certificate comes from a private CA (a Supervisor service's, for one) is trusted by the cluster's nodes, but not by the image-reflector-controller, which runs in a Pod with its own CA bundle. Patch `certSecretRef: {name: harbor-ca}` onto the ImageRepository from the Kustomization that syncs this repository, and have a `harbor-ca` Secret (key `ca.crt`) in the `devcontainer` namespace. The Gitops repository does both: its `devcontainer` ResourceSet copies `harbor-ca` and `harbor-pull` from `flux-system`.
+- The placeholder `harbor.example` in the ImageRepository and the Roster's `imageRepository` is replaced per network by the Kustomization that syncs this repository; the Gitops repository patches both to `${HARBOR_REGISTRY}/${HARBOR_PROJECT}/devcontainer/standard`, so publish and import to that path (`HARBOR_IMAGE`). The Management Cluster runs no Kyverno, so nothing rewrites the image: the Roster's repository must be exactly where the Registry holds it.
 
-**Checked on a kind cluster** (`tests/kind/up.sh`, then `tests/cluster-live.sh`) with Flux's image controllers and the Gitops repository's Kyverno policies, pulling the image the local GitLab CI built: the Pod runs under Pod Security `restricted` and answers SSH with the Roster's key; a restart keeps the State Directory and host key; a new tag is committed to the Roster on the push branch, and once merged reaches the StatefulSet but the Pod only on restart; removing the admin removes the Pod and keeps the volume, and adding them back finds their state. **Unverified:** Istio programming the Gateway, and real Harbor.
+**Checked on a kind cluster** (`tests/kind/up.sh`, then `tests/cluster-live.sh`) with Flux's image controllers and, before the Management Cluster dropped it, the Gitops repository's Kyverno policies, pulling the image the local GitLab CI built: the Pod runs under Pod Security `restricted` and answers SSH with the Roster's key; a restart keeps the State Directory and host key; a new tag is committed to the Roster on the push branch, and once merged reaches the StatefulSet but the Pod only on restart; removing the admin removes the Pod and keeps the volume, and adding them back finds their state. **Unverified:** Istio programming the Gateway, and real Harbor.
 
 ## Rolling back
 
-Narrow the ImagePolicy `range` in `manifests/devcontainer/image-automation.yaml` to the exact earlier version, for example `"0.1.0"`, and merge. The automation then rewrites the Roster's image to it on the push branch; merge that too, and admins pick it up on their next Pod restart. Restoring `">=0.1.0"` resumes following Releases. Editing the Roster's image line alone does not stick: the automation moves it forward again.
+Narrow the ImagePolicy `range` in `manifests/devcontainer/image-automation.yaml` to the exact earlier version, for example `"0.1.0"`, and merge. The automation then rewrites the Roster's `imageTag` to it on the push branch; merge that too, and admins pick it up on their next Pod restart. Restoring `">=0.1.0"` resumes following Releases. Editing the Roster's `imageTag` alone does not stick: the automation moves it forward again.
+
+## Settings outside this repository
+
+These live in Harbor and GitLab, not in Git, so no check here can see them. Set them once per network and confirm them in the e2e checklist (section 1).
+
+- **Harbor: make Release tags immutable** on the Standard Image's repository, on both networks: a tag immutability rule matching `v*.*.*` and `*.*.*`. `release/import.sh` already refuses an existing tag, but the pipeline's `publish` would overwrite one if a tag pipeline is re-run; the rule makes Harbor refuse it too.
+- **GitLab: the `image-updates` merge request.** The automation's commits say `[skip ci]`, so the merge request's pipeline is skipped. If the project requires "Pipelines must succeed", also turn on "Skipped pipelines are considered successful" (Settings, Merge requests), or the rollout can't be merged.
+- **GitLab: the `candidate` cleanup policy** (above).
+- **Protected tags:** the Release tag pattern, so only the Release Owner can publish (above).
+
+The Management Cluster's own outside settings (DNS for the Gateway address, snapshots of the admins' volumes) are the Gitops repository's: see its README, "Management Cluster: Devcontainer Pods".
+
+## Carrying this repository to another network
+
+Each network's GitLab holds its own copy of this repository, which its Management Cluster syncs (the Gitops repository's `DEVCONTAINER_REPO_URL`). Keep the copies identical apart from the Roster, so carrying a change across is a plain merge:
+
+- **Nothing site-specific is committed.** The Registry (`imageRepository`, the ImageRepository), the Gateway address, the Pod CIDR and Site Config all come from the Gitops repository's patches and its bootstrap runtime facts. Don't edit them in the copy.
+- **The image automation commits only `imageTag`.** Release versions are the same on every network, so its commits never conflict between copies.
+- **The Roster's `admins` is per network.** Smartcards differ between networks (a SIPR token is not a NIPR CAC), so each copy keeps its own keys, and possibly its own admins and ports. To stop a merge from the other network from overwriting them, add to that copy's `.git/info/attributes` (not committed):
+
+  ```text
+  manifests/devcontainer/roster.yaml merge=ours
+  ```
+
+  and run `git config merge.ours.driver true` in the clone you merge from. A Roster format change from the other network then has to be carried over by hand, so call it out in the Review Packet when one happens.
 
 ## Known limits
 

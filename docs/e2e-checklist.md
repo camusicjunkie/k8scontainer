@@ -6,7 +6,7 @@ Record the date, the Release version, who ran it, the result of every step and a
 
 ## Setup
 
-- **Management Cluster** on the Disconnected Side with Flux (including the image controllers and an ImageUpdateAutomation for this repository in the `devcontainer` namespace, pushing to `image-updates` with its own write credential; see the Release Owner guide), Kyverno, Istio (a gateway only; no mesh is needed) and the Gateway API CRDs, standard channel v1.7.0, and Istio 1.31 or later, as the Gitops repository's `clusters/management/istio.yaml` installs them.
+- **Management Cluster** on the Disconnected Side with Flux (including the image controllers and an ImageUpdateAutomation for this repository in the `devcontainer` namespace, pushing to `image-updates` with its own write credential; see the Release Owner guide), no Kyverno, Istio (a gateway only; no mesh is needed) and the Gateway API CRDs, standard channel v1.7.0, and Istio 1.31 or later, as the Gitops repository's `clusters/management/istio.yaml` installs them.
 - **Two test admins** on the Roster, with real smartcards, different ports. Call them A and B.
 - **A Workstation** with the Windows OpenSSH agent holding the card's keys, and the Release's Workstation pack.
 - **Two Releases** already imported (the one under test and the one before it), for sections 7 and 9. Have kubectl access to the Management Cluster for the checks that say so.
@@ -19,15 +19,20 @@ Record the date, the Release version, who ran it, the result of every step and a
 - [ ] Running `release/import.sh` again for the same version refuses with "already exists".
 - [ ] **[unverified]** The import works against the real Harbor, with `DEST_CREDS` (authentication and TLS).
 - [ ] A corrupted copy of the archive is refused before anything is imported.
+- [ ] **[unverified]** Harbor refuses to overwrite a Release tag (the tag immutability rule in the Release Owner guide's "Settings outside this repository"); for example, a `skopeo copy` of any image to an existing Release tag fails.
+- [ ] **[unverified]** The Review Packet's "Image labels" section shows this Release's version and commit.
 
 ## 2. Admission and provisioning
 
 - [ ] **[unverified]** The Flux Operator reports the ResourceSet `devcontainer` Ready, and the inventory holds, per admin, a StatefulSet, a key list, two Services and a TCPRoute, plus one Gateway.
 - [ ] **[unverified]** The Devcontainer Namespace enforces Pod Security `restricted` (label `pod-security.kubernetes.io/enforce=restricted`) and the Pods start under it: `kubectl -n devcontainer get pods` shows `devc-<name>-0` Running with no admission warnings.
-- [ ] **[unverified]** The existing Kyverno policies admit the Pods and the other generated objects (no policy violation reports for the namespace). The Management Cluster runs no Kyverno today; if it does, the Gitops repository's CEL policies apply: the image rewrite mutates only Pods (`MutatingPolicy`, autogen off), and `require-ambient-dataplane` flags the Devcontainer Namespace, which joins no mesh, so exclude it there before that policy moves to `Deny`.
+- [ ] **[unverified]** The Pods pull the Standard Image from the Registry with no image rewrite (the Management Cluster runs no Kyverno): `kubectl -n devcontainer get pod devc-<name>-0 -o jsonpath='{.spec.containers[0].image}'` is `<Registry>/<project>/devcontainer/standard:<tag>`, and the default ServiceAccount carries `harbor-pull`. If Kyverno is ever added there, its CEL policies apply: the image rewrite mutates only Pods (`MutatingPolicy`, autogen off), and `require-ambient-dataplane` flags the Devcontainer Namespace, which joins no mesh, so exclude it there before that policy moves to `Deny`.
 - [ ] **[unverified]** The Roster's `storageClass`, or the cluster's default class when it has none, binds each admin's claim `state-devc-<name>-0`.
 - [ ] **[unverified]** The cluster's Gateway API CRDs serve `TCPRoute` at `v1` (what the ResourceSet renders) and istiod is 1.31 or later (`istioctl version`), so the Gateway's listeners accept the TCPRoutes. The gateway Pod `devcontainer-istio` runs in the Devcontainer Namespace under Pod Security `restricted`.
 - [ ] **[unverified]** The Gateway is Programmed with one external IP, one listener per admin, and each TCPRoute is Accepted and has resolved refs.
+- [ ] **[unverified]** With `gatewayAddress` set for this network, the Gateway's address is that IP, and its DNS name resolves to it from a Workstation.
+- [ ] **[unverified]** The NetworkPolicy holds: from A's Pod, `bash -c ': </dev/tcp/<B's Pod IP>/2222'` fails (no Pod-to-Pod SSH), and so does a connection to any other Pod IP in the cluster; `getent hosts kubernetes.default` still resolves, and a Supervisor, GitLab and Harbor are reachable. The policy's Pod CIDR is this cluster's (`kubectl -n devcontainer get networkpolicy devcontainer-pods -o yaml`).
+- [ ] **[unverified]** The readiness probe reads sshd's pid file: `kubectl -n devcontainer describe pod devc-<name>-0` shows the exec probe, the Pod is Ready, and the Pod's log has no pre-auth disconnects every 10 seconds.
 - [ ] The Pod has no Kubernetes API credentials: inside the Pod there is no ServiceAccount token under `/var/run/secrets/kubernetes.io`.
 - [ ] Adding a Roster entry for a third test admin by merge creates their Pod and listener without a manual step. Removing the entry prunes their Pod, Services, TCPRoute and listener, and leaves their PVC. Delete the PVC by hand afterwards.
 
@@ -56,6 +61,7 @@ Record the date, the Release version, who ran it, the result of every step and a
 
 ## 6. Site Config, Personal Config and klogin
 
+- [ ] **[unverified]** Site Config is the network's, not this repository's placeholder: `kubectl -n devcontainer get configmap site-config -o yaml` shows the values bootstrap wrote (the Gitops repository's `devcontainer-site-config` in `flux-system`), and no placeholder CA.
 - [ ] Site Config: with the network's CAs in the Site Config ConfigMap, `cat /var/lib/devc/trust/report` lists them as added, and a TLS request to an internal host signed by that CA succeeds.
 - [ ] Site Config values (`KLOGIN_SERVERS`, `KLOGIN_NAMESPACES`, `KLOGIN_CLUSTERS`) are visible in a login shell and in `ssh host command`, and a value in `personal.env` overrides one from Site Config.
 - [ ] Write an alias into `~/.devc/personal/bashrc` and open a new terminal: the alias works, and still works after a Pod restart.
@@ -75,7 +81,7 @@ Record the date, the Release version, who ran it, the result of every step and a
 ## 8. Update to a new Release, then rollback
 
 - [ ] **[unverified]** With Release N running, push Release N+1's tag to the Connected Harbor and import it on the Disconnected Side. Within the scan interval, the ImageRepository lists the new tag and the ImagePolicy selects it.
-- [ ] **[unverified]** The ImageUpdateAutomation rewrites the marked `image:` line in `roster.yaml` on the `image-updates` branch, and the StatefulSet is unchanged until that merge request is merged. After the merge Flux applies it and the StatefulSet's Pod template shows the new image.
+- [ ] **[unverified]** The ImageUpdateAutomation rewrites only the marked `imageTag` in `roster.yaml` on the `image-updates` branch (no Registry host appears in the commit), and the StatefulSet is unchanged until that merge request is merged. After the merge Flux applies it and the StatefulSet's Pod template shows the new image.
 - [ ] **[unverified]** Running Pods were **not** restarted by the change (`kubectl -n devcontainer get pods` shows unchanged ages and the old image on A's Pod).
 - [ ] After A restarts the Pod, it runs the new image and the section 7 markers are intact. B, who did not restart, still runs the old image.
 - [ ] If the new Release carries a new VS Code commit: the old Workstation pack's VS Code gets a mismatch, and the new pack's `install.ps1 -From <old folder>` fixes it and carries settings forward.
