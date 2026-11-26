@@ -17,66 +17,77 @@ so a rerun, even with a new -Port, replaces that block and leaves the rest of
 the file alone. A hand-written Host of the same name is never touched: the
 script stops before writing anything and asks you to pick another -HostAlias.
 
-.PARAMETER GatewayHost
-The Gateway's DNS name or IP address (the one shared by every admin).
-
-.PARAMETER Port
-Your own port on the Gateway, from the Roster.
-
-.PARAMETER HostAlias
-The Host name to write in the SSH config and to pick in Remote-SSH. Default: devcontainer
-
-.PARAMETER User
-The Pod's login user. Default: dev (the Standard Image's user).
-
-.PARAMETER Destination
-Where per-Release folders go. Default: %LOCALAPPDATA%\Programs\devcontainer-vscode
-
-.PARAMETER SshConfig
-The SSH config file to update. Default: ~\.ssh\config
-
-.PARAMETER From
-A previous Release's install folder whose data\user-data (settings,
-keybindings, state) is carried forward. Extensions are not: they come from this
-Release's VSIX file.
-
 .EXAMPLE
 .\install.ps1 -GatewayHost gateway.example.internal -Port 2201
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidatePattern('^[A-Za-z0-9._:-]+$')][string]$GatewayHost,
-    [Parameter(Mandatory)][ValidateRange(1, 65535)][int]$Port,
-    [ValidatePattern('^[A-Za-z0-9._-]+$')][string]$HostAlias = 'devcontainer',
-    [ValidatePattern('^[A-Za-z0-9._-]+$')][string]$User = 'dev',
-    [string]$Destination = (Join-Path $env:LOCALAPPDATA 'Programs\devcontainer-vscode'),
-    [string]$SshConfig = (Join-Path $HOME '.ssh\config'),
-    [string]$From
+    # The Gateway's DNS name or IP address (the one shared by every admin). Prefer the DNS name.
+    [Parameter(Mandatory)]
+    [ValidatePattern('^[A-Za-z0-9._:-]+$')]
+    [string] $GatewayHost,
+
+    # Your own port on the Gateway, from the Roster.
+    [Parameter(Mandatory)]
+    [ValidateRange(1, 65535)]
+    [int] $Port,
+
+    # The Host name to write in the SSH config and to pick in Remote-SSH.
+    [ValidatePattern('^[A-Za-z0-9._-]+$')]
+    [string] $HostAlias = 'devcontainer',
+
+    # The Pod's login user (the Standard Image's user).
+    [ValidatePattern('^[A-Za-z0-9._-]+$')]
+    [string] $User = 'dev',
+
+    # Where per-Release folders go.
+    [string] $Destination = (Join-Path $env:LOCALAPPDATA 'Programs\devcontainer-vscode'),
+
+    # The SSH config file to update.
+    [string] $SshConfig = (Join-Path $HOME '.ssh\config'),
+
+    # A previous Release's install folder whose data\user-data (settings,
+    # keybindings, state) is carried forward. Extensions are not: they come
+    # from this Release's VSIX file.
+    [string] $From
 )
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
 $utf8 = New-Object System.Text.UTF8Encoding($false)   # no BOM: OpenSSH and VS Code dislike one
 
-function Get-Sha([string]$Path) { (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant() }
+function Get-Sha {
+    param(
+        # The file to hash.
+        [string] $Path
+    )
+    (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLower()
+}
 
-# 1. Every file, before anything is written. $covered remembers what SHA256SUMS vouches for.
+# 1. Every file, before anything is written. $covered remembers what SHA256SUMS
+#    vouches for; a hashtable's keys are case-insensitive, as Windows paths are.
 Write-Host 'Checking SHA256SUMS'
 $covered = @{}
 $sumsFile = Join-Path $here 'SHA256SUMS'
 if (-not (Test-Path -LiteralPath $sumsFile)) { throw "missing file: $sumsFile" }
 foreach ($line in Get-Content -LiteralPath $sumsFile) {
     if ($line -notmatch '^([0-9a-fA-F]{64}) [ *](.+)$') { throw "SHA256SUMS: can't read line: $line" }
-    $want = $Matches[1].ToLowerInvariant()
+    $want = $Matches[1].ToLower()
     $name = $Matches[2] -replace '/', '\'
     if ([IO.Path]::IsPathRooted($name) -or ($name -split '\\') -contains '..') { throw "SHA256SUMS: path leaves the Release folder: $name" }
     $file = Join-Path $here $name
     if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "missing file: $file" }
     $have = Get-Sha $file
     if ($have -ne $want) { throw "SHA-256 mismatch for ${file}: expected $want, got $have. The copy is damaged; don't install it." }
-    $covered[$name.ToLowerInvariant()] = $true
+    $covered[$name] = $true
 }
-function Assert-Covered([string]$Name) {
-    if (-not $covered.ContainsKey($Name.ToLowerInvariant())) { throw "$Name is not covered by SHA256SUMS; refusing to use it" }
+function Assert-Covered {
+    param(
+        # A file name from the Release folder, as release.json names it.
+        [string] $Name
+    )
+    if (-not $covered.ContainsKey($Name)) {
+        throw "$Name is not covered by SHA256SUMS; refusing to use it"
+    }
 }
 
 # 2. What the Release says, and that it is the VS Code the image bakes in.
@@ -118,7 +129,7 @@ if ($own.Success) {
     $newSsh = $sshText.Substring(0, $own.Index) + $block + $sshText.Substring($own.Index + $own.Length)
 } else {
     $sep = ''
-    if ($sshText.Length -gt 0) { $sep = if ($sshText.EndsWith("`n")) { "`n" } else { "`n`n" } }
+    if ($sshText.Length -gt 0) { $sep = if ($sshText -match '\n$') { "`n" } else { "`n`n" } }
     $newSsh = $sshText + $sep + $block
 }
 
