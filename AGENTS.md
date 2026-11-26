@@ -4,9 +4,9 @@
 
 ## Prior art
 
-"The old repository" in specs and tickets is the Docker Host devcontainer, checked out read-only at `D:\Docker\devcontainer` (`github.com/camusicjunkie/devcontainer`).
+"The old repository" in specs and tickets is the Docker Host devcontainer, checked out at `D:\Docker\devcontainer` (`github.com/camusicjunkie/devcontainer`). Read it; it stays read-only.
 
-"The Gitops repository" is checked out read-only at `D:\Docker\Gitops` (`github.com/camusicjunkie/Gitops`): the clusters' Flux setup, Kyverno policies (`apps/kyverno/configs`) and image automation. `tests/kind/up.sh` builds a kind cluster running its policies for `tests/cluster-live.sh`.
+"The Gitops repository" is checked out at `D:\Docker\Gitops` (`github.com/camusicjunkie/Gitops`): the clusters' Flux setup and image automation. `tests/kind/up.sh` builds a kind cluster that mirrors its Management Cluster setup (`clusters/management`) for `tests/cluster-live.sh`. Change the checkout only when the task is a Gitops change, on its own branch with its own PR; otherwise read it.
 
 ## Agent skills
 

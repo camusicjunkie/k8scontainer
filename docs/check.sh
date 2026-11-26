@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Mechanical checks on README.md and docs/*.md: (1) no GLOSSARY.md _Avoid_ term in prose,
 # (2) every repo path cited in backticks exists, (3) every script/command named
-# in backticks that this repo ships exists. Run from anywhere: docs/check.sh
+# in backticks that this repo ships exists, (4) every path AGENTS.md cites exists
+# here or in the Gitops repository's checkout. Run from anywhere: docs/check.sh
 set -uo pipefail
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$repo" || exit 1
@@ -39,6 +40,28 @@ for d in "${docs[@]}"; do
         fi
     done < <(grep -o '`[^`]*`' "$d" | tr -d '`' | sort -u)
 done
+
+# AGENTS.md's paths: every backticked relative path exists. A path whose first
+# segment is in this repository is checked here; any other is a Gitops
+# repository path, checked in its checkout (GITOPS_DIR, else Gitops beside the
+# main checkout), and reported as skipped when there is none (CI).
+gitops=${GITOPS_DIR:-$(dirname "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo "$repo/.git")")")/Gitops}
+gitops_skipped=()
+while read -r p; do
+    p=${p%/}
+    case $p in
+        *'<'* | *'*'* | *' '* | *'\'* | http* | github.com/* | /* | '~'* | -*) continue ;;
+    esac
+    [[ $p == */* || $p == *.md || $p == *.sh ]] || continue
+    if [[ -e ${p%%/*} ]]; then
+        [[ -e $p ]] || bad "AGENTS.md cites missing path: $p"
+    elif [[ -d $gitops ]]; then
+        [[ -e $gitops/$p ]] || bad "AGENTS.md cites a Gitops repository path missing from $gitops: $p"
+    else
+        gitops_skipped+=("$p")
+    fi
+done < <(grep -o '`[^`]*`' AGENTS.md | tr -d '`' | sort -u)
+((${#gitops_skipped[@]})) && echo "SKIP AGENTS.md's Gitops repository paths (no checkout at $gitops; set GITOPS_DIR): ${gitops_skipped[*]}"
 
 # Shipped commands the docs name, by their bare names.
 for c in secrets with-secrets klogin devc-selftest devc-sshd devc-ca-refresh; do
