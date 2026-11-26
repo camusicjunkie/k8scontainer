@@ -61,7 +61,7 @@ Record the date, the Release version, who ran it, the result of every step and a
 
 ## 6. Site Config, Personal Config and klogin
 
-- [ ] **[unverified]** Site Config is the network's, not this repository's placeholder: `kubectl -n devcontainer get configmap site-config -o yaml` shows the values bootstrap wrote (the Gitops repository's `devcontainer-site-config` in `flux-system`), and no placeholder CA.
+- [ ] **[unverified]** Site Config is the network's, not this repository's placeholder: `kubectl -n devcontainer get configmap site-config -o yaml` shows the values bootstrap wrote (the Gitops repository's `devcontainer_site_env` and `devcontainer_site_ca`, in `binaryData`), and no placeholder CA.
 - [ ] Site Config: with the network's CAs in the Site Config ConfigMap, `cat /var/lib/devc/trust/report` lists them as added, and a TLS request to an internal host signed by that CA succeeds.
 - [ ] Site Config values (`KLOGIN_SERVERS`, `KLOGIN_NAMESPACES`, `KLOGIN_CLUSTERS`) are visible in a login shell and in `ssh host command`, and a value in `personal.env` overrides one from Site Config.
 - [ ] Write an alias into `~/.devc/personal/bashrc` and open a new terminal: the alias works, and still works after a Pod restart.
