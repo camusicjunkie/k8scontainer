@@ -28,6 +28,7 @@ PINS = {"vscode.env": "image/packages/vscode.env",
         "vscode-extensions.txt": "image/packages/vscode-extensions.txt",
         "Dockerfile": "image/Dockerfile"}
 
+sys.dont_write_bytecode = True   # no release/__pycache__ left in the checkout
 spec = importlib.util.spec_from_file_location("update_pins", ROOT / "release/update-pins.py")
 update_pins = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(update_pins)
