@@ -46,7 +46,8 @@ subst() { "$py" -I "$(native "$repo/tests/site/subst.py")"; }
 # substitutes to empty would reach the ResourceSet as null. The sample Rosters
 # in tests/rosters are substituted as they are.
 render() {
-    local roster=$work/roster-$(basename "$1") built=$work/built.yaml
+    local roster built=$work/built.yaml
+    roster=$work/roster-$(basename "$1")
     { cat "$repo/tests/kind/namespace.yaml"; echo ---
       kubectl kustomize "$(native "$repo/manifests/devcontainer")" 2>"$work/err"; } | subst >"$built" || return 1
     if [[ $1 -ef $repo/manifests/devcontainer/roster.yaml ]]; then

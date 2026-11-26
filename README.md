@@ -112,8 +112,10 @@ devc-entrypoint                    refuses to run as root
 ```text
 build       buildah build image/ → push $CI_REGISTRY_IMAGE/candidate:<sha>-<pipeline id>
 ├─ selftest buildah run --network none candidate -- devc-selftest
-└─ checks   tests/all.sh --files   (no image needed; starts at once)
-publish     only on tags vX.Y.Z / X.Y.Z, needs selftest + checks:
+├─ checks   tests/all.sh --files   (no image needed; starts at once)
+├─ shellcheck  tests/lint.sh shellcheck   (from a pinned shellcheck image)
+└─ hadolint    tests/lint.sh hadolint     (from the image HADOLINT_IMAGE pins)
+publish     only on tags vX.Y.Z / X.Y.Z, needs selftest + checks + both linters:
             skopeo copy candidate → $HARBOR_IMAGE:<tag>
 ```
 
@@ -292,6 +294,7 @@ tests/all.sh --files   # the file checks only: what CI's `checks` job runs
 | `tests/repo.py` | every Pod-side path the image reads is mounted or shipped; base images pinned by digest; glossary terms in comments; ticket hygiene | Python |
 | `tests/update-pins.py` | `release/update-pins.py` against recorded upstream responses (`tests/update-pins/`): each pin file rewritten exactly, nothing written when nothing changed or a lookup fails, one group alone, pre-releases and extensions the VS Code can't run skipped | Python |
 | `docs/check.sh` | docs use glossary terms, cite paths that exist, and state facts that match the code | bash |
+| `tests/lint.sh` | shellcheck at warning severity on every shell script (by extension or shebang); hadolint on `image/Dockerfile`, at the version `HADOLINT_IMAGE` pins | shellcheck, hadolint |
 | `tests/image.sh` | builds the image; runs `devc-selftest` with no network as `dev` | Docker |
 | `tests/secrets-klogin.sh` | runs the image the way the Pod does and drives `secrets`, `with-secrets` and `klogin` over SSH with a software agent standing in for the smartcard | Docker |
 | `tests/release.sh` | `cut.sh` then `import.sh` between two throwaway registries; digest preserved, overwrite and corruption refused | Docker |

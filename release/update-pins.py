@@ -7,13 +7,14 @@ Name groups (listed at the end of --help) to refresh only those; none means
 all. The Release Owner runs it at the start of a Release on the Connected
 Side's Linux Docker host, in a clone at the Release branch. It looks up the
 newest version of each selected pin, then rewrites image/packages/vscode.env,
-image/packages/vscode-extensions.txt and image/Dockerfile, leaving the change
-in the working tree as a diff to review. It builds, commits and pushes nothing.
+image/packages/vscode-extensions.txt, image/Dockerfile and the images of the
+pipeline's linter jobs in .gitlab-ci.yml, leaving the change in the working
+tree as a diff to review. It builds, commits and pushes nothing.
 
 Every checksum comes from its publisher: the VS Code update API, and the
 `digest` the GitHub release API gives each release asset. Image digests come
 from `docker buildx imagetools inspect`, which uses the host's `docker login`;
-only the dhi, brew and hadolint groups need it, and dhi needs a login to dhi.io,
+only the dhi, brew, hadolint and shellcheck groups need it, and dhi needs a login to dhi.io,
 checked before any lookup. Every lookup happens before any write, so a failed
 one writes nothing. `GITHUB_TOKEN` is sent to the GitHub API when set.
 """
@@ -32,11 +33,19 @@ ROOT = Path(__file__).resolve().parent.parent
 VSCODE_ENV = "image/packages/vscode.env"
 EXTENSIONS = "image/packages/vscode-extensions.txt"
 DOCKERFILE = "image/Dockerfile"
+PIPELINE = ".gitlab-ci.yml"
 
-# Image pins, and the GitHub project whose newest release names the tag.
-# DHI_BASE keeps its tag and takes the tag's current digest.
-IMAGES = {"dhi": ("DHI_BASE", None), "brew": ("BREW_IMAGE", "Homebrew/brew"),
-          "hadolint": ("HADOLINT_IMAGE", "hadolint/hadolint")}
+
+class Image(NamedTuple):
+    arg: str | None    # its `ARG <arg>=` in the Dockerfile; None for an image only the pipeline runs
+    repo: str | None   # the GitHub project whose newest release names the tag; None keeps the tag
+    job: str | None    # the pipeline job that runs the same image (tests/ci.py checks they match)
+
+
+# Image pins. DHI_BASE keeps its tag and takes the tag's current digest.
+IMAGES = {"dhi": Image("DHI_BASE", None, None), "brew": Image("BREW_IMAGE", "Homebrew/brew", None),
+          "hadolint": Image("HADOLINT_IMAGE", "hadolint/hadolint", "hadolint"),
+          "shellcheck": Image(None, "koalaman/shellcheck", "shellcheck")}
 # Downloaded tools: where each comes from is read from the Dockerfile's
 # `ADD --checksum=sha256:${<GROUP>_SHA256} <release asset URL>`.
 TOOLS = ("codex", "tflint", "pwsh")
@@ -67,8 +76,8 @@ class PinFileError(Exception):
 
 
 class Change(NamedTuple):
-    file: str   # VSCODE_ENV, EXTENSIONS or DOCKERFILE
-    pin: str
+    file: str   # VSCODE_ENV, EXTENSIONS, DOCKERFILE or PIPELINE
+    pin: str    # in PIPELINE, the job
     old: str | None
     new: str
 
@@ -256,21 +265,30 @@ def image_digest(imagetools, ref, pin):
     return m[1]
 
 
-def newest_image(fetch, imagetools, group, args):
-    """The image pin's Change: its project's newest release tag (if it has a project) and that tag's digest."""
-    pin, repo = IMAGES[group]
-    current = args.get(pin)
+def newest_image(fetch, imagetools, group, args, pipeline):
+    """The image pin's Changes, in the Dockerfile and the pipeline job that run it: its project's
+    newest release tag (if it has a project) and that tag's digest."""
+    image = IMAGES[group]
+    pin = image.arg or image.job
+    in_job = job_image(pipeline, image.job) if image.job else None
+    if image.job and not IMAGE_REF.fullmatch(in_job[1] if in_job else ""):
+        raise LookupFailed(image.job, f"no `<image>:<tag>@sha256:<digest>` image in the {image.job} job of {PIPELINE}")
+    current = args.get(image.arg) if image.arg else in_job[1]
     m = IMAGE_REF.fullmatch(current or "")
     if not m:
         raise LookupFailed(pin, f"no `ARG {pin}=<image>:<tag>@sha256:<digest>` in {DOCKERFILE}")
     name, tag = m.groups()
-    if repo:
+    if image.repo:
         old = re.search(r"\d+(?:\.\d+)+", tag)
         if not old:
             raise LookupFailed(pin, f"{current} has no version in its tag to move")
-        version, _ = newest_release(fetch, repo, r"v?(\d+\.\d+\.\d+)", pin)
+        version, _ = newest_release(fetch, image.repo, r"v?(\d+\.\d+\.\d+)", pin)
         tag = tag.replace(old[0], version, 1)
-    return Change(DOCKERFILE, pin, current, f"{name}:{tag}@{image_digest(imagetools, f'{name}:{tag}', pin)}")
+    new = f"{name}:{tag}@{image_digest(imagetools, f'{name}:{tag}', pin)}"
+    changes = [Change(DOCKERFILE, image.arg, current, new)] if image.arg else []
+    if image.job:
+        changes.append(Change(PIPELINE, image.job, in_job[1], new))
+    return changes
 
 
 def newest_tool(fetch, group, args, dockerfile):
@@ -307,7 +325,8 @@ def look_up(groups, before, fetch, imagetools):
     if "extensions" in groups:
         changes += [Change(EXTENSIONS, ext, old, newest_extension(fetch, ext, vscode))
                     for ext, old in re.findall(r"^([\w.-]+)@([^\s#]+)", before[EXTENSIONS], re.M)]
-    changes += [newest_image(fetch, imagetools, g, args) for g in groups if g in IMAGES]
+    for g in (g for g in groups if g in IMAGES):
+        changes += newest_image(fetch, imagetools, g, args, before[PIPELINE])
     for g in (g for g in groups if g in TOOLS):
         changes += newest_tool(fetch, g, args, before[DOCKERFILE])
     return changes
@@ -327,9 +346,24 @@ def set_extension(text, change):
                   f"{change.pin}@{change.new}", text, flags=re.M)
 
 
+def job_image(text, job):
+    """The match of a pipeline job's image (group 1): its `image:` value, or the `name:`
+    under it. Only the job's own indented lines are read."""
+    return re.search(rf"^{re.escape(job)}:[ \t]*\r?\n(?:[ \t]*\r?\n|[ \t]+[^\r\n]*\r?\n)*?"
+                     r"[ \t]+(?:image|name):[ \t]*([^\s#]+)", text, re.M)
+
+
+def set_job_image(text, change):
+    m = job_image(text, change.pin)
+    if not m or m[1] != change.old:
+        raise PinFileError(f"{change.pin}: no {change.pin} job running {change.old} in {change.file}")
+    return text[:m.start(1)] + change.new + text[m.end(1):]
+
+
 REWRITE = {VSCODE_ENV: lambda text, c: set_line(text, c.pin, c),
            DOCKERFILE: lambda text, c: set_line(text, f"ARG {c.pin}", c),
-           EXTENSIONS: set_extension}
+           EXTENSIONS: set_extension,
+           PIPELINE: set_job_image}
 
 
 def rewrite(before, changes):
@@ -360,7 +394,8 @@ def report(changes, out):
         return
     for c in changed:
         flag = "  [major version]" if c.old and major_jump(c.old, c.new) else ""
-        print(f"{c.pin} {c.old} -> {c.new}{flag}", file=out)
+        label = f"{c.pin} job" if c.file == PIPELINE else c.pin
+        print(f"{label} {c.old} -> {c.new}{flag}", file=out)
     print("\nStill by hand: review `git diff`, then commit and push.", file=out)
     if any(c.file == VSCODE_ENV for c in changed):
         print("The Workstation pack needs the portable VS Code zip and the Remote-SSH VSIX for the new pins "
@@ -383,7 +418,7 @@ def main(argv=None, root=ROOT, fetch=http_json, imagetools=docker_imagetools, bu
         print(why, file=err)
         return 1
 
-    paths = {f: Path(root) / f for f in (VSCODE_ENV, EXTENSIONS, DOCKERFILE)}
+    paths = {f: Path(root) / f for f in (VSCODE_ENV, EXTENSIONS, DOCKERFILE, PIPELINE)}
     before = {f: p.read_bytes().decode("utf-8") for f, p in paths.items()}
     try:
         changes = look_up(groups, before, fetch, imagetools)

@@ -60,6 +60,32 @@ checks:
     - pip install --quiet pyyaml==6.0.2
     - bash tests/all.sh --files
 
+# The linters, beside the file checks. tests/all.sh skips them where they are
+# not installed; here each runs from its own image, so CI never skips them.
+# hadolint is the image the Dockerfile's HADOLINT_IMAGE pins (tests/ci.py
+# checks they match): older releases reject its ADD --checksum.
+# release/update-pins.py moves both images (its hadolint and shellcheck groups).
+shellcheck:
+  stage: test
+  needs: []
+  image:
+    name: docker.io/koalaman/shellcheck-alpine:v0.10.0@sha256:5921d946dac740cbeec2fb1c898747b6105e585130cc7f0602eec9a10f7ddb63
+    entrypoint: [""]
+  # tests/lint.sh lists the scripts with git ls-files; the image has no git.
+  script:
+    - apk add --no-cache git
+    - sh tests/lint-scripts.sh
+    - sh tests/lint.sh shellcheck
+
+hadolint:
+  stage: test
+  needs: []
+  image:
+    name: docker.io/hadolint/hadolint:v2.15.1-debian@sha256:9a3944b7fddcb947d1ffd90829ac1a6e5c30479223358f249d8b96c7d0019e27
+    entrypoint: [""]
+  script:
+    - sh tests/lint.sh hadolint
+
 build:
   stage: build
   image: quay.io/buildah/stable:v1.46.1
@@ -96,7 +122,7 @@ selftest:
 
 publish:
   stage: publish
-  needs: [selftest, checks]
+  needs: [selftest, checks, shellcheck, hadolint]
   image:
     name: quay.io/skopeo/stable:v1.25.1
     entrypoint: [""]

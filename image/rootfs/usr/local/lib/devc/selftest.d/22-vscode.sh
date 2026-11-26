@@ -68,13 +68,13 @@ server_lists_extensions() {
 # Remote-SSH starts the server with --start-server; it must come up with no
 # network and no root, and say where it listens.
 server_starts_offline() {
-    local log pid i
+    local log pid _
     log=$(mktemp) || return 1
     "$server" --start-server --host 127.0.0.1 --port 0 --without-connection-token \
         --accept-server-license-terms --server-data-dir "$(mktemp -d)" \
         --extensions-dir "$vscode_home/extensions" >"$log" 2>&1 </dev/null &
     pid=$!
-    for i in $(seq 60); do
+    for _ in $(seq 60); do
         if grep -q 'listening on' "$log"; then
             kill "$pid" 2>/dev/null
             wait "$pid" 2>/dev/null

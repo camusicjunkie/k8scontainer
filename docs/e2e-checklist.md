@@ -2,7 +2,7 @@
 
 The manual gate for a Release. Run it on the Disconnected Side before a Release is declared good, and again whenever the VS Code commit, the Roster/ResourceSet manifests or the image automation change. `devc-selftest`, `tests/image.sh`, `tests/cluster.sh`, `tests/release.sh`, `tests/secrets-klogin.sh` and the installer's Pester tests cover the parts that need no real cluster, card or Gateway; `tests/cluster-live.sh` runs sections 2, 7, 8 and 9's cluster side on a kind cluster, but not under Istio, real Harbor or the real Management Cluster. This checklist covers what they could not: the Workstation, the Gateway, the smartcard, the Management Cluster and the Devcontainer Pod together, with no Internet. Each item names what it settles; items marked **[unverified]** are the ones the tickets recorded as never having run against the real thing.
 
-Section 10 is the exception: it runs on the Connected Side, at the start of the Release.
+Sections 10 and 11 are the exceptions: they run on the Connected Side, section 10 at the start of the Release.
 
 Record the date, the Release version, who ran it, the result of every step and anything odd. A failure blocks the Release until it is fixed.
 
@@ -105,6 +105,13 @@ Run at the start of the Release, on the Connected Side, before the build the sec
 - [ ] **[unverified]** On the Connected Side's Linux Docker host, in a clone at the Release branch, `python3 release/update-pins.py` after `docker login dhi.io` refreshes every group, including `dhi`'s digest through `docker buildx imagetools inspect`, and leaves only the pin files changed in `git diff`. It has run only on a Windows development machine.
 - [ ] **[unverified]** The `dhi.io` login check matches that host: after `docker login dhi.io` (with a credential helper, if the host has one) the `dhi` group passes the check; after `docker logout dhi.io`, `python3 release/update-pins.py dhi` stops before any lookup and names `docker login dhi.io`. The check reads `auths` and `credHelpers` in `~/.docker/config.json` (or `$DOCKER_CONFIG`), on the understanding that `docker login` writes an `auths` entry even when `credsStore` keeps the secret.
 - [ ] **[unverified]** The pipeline's `build` job pulls `BREW_IMAGE` from `ghcr.io` (buildah, no login for `ghcr.io`), now that the pin has moved there from Docker Hub.
+
+## 11. The pipeline's linter jobs
+
+On the Connected Side's GitLab, not the Disconnected Side: `tests/ci.py` checks the `shellcheck` and `hadolint` jobs in `.gitlab-ci.yml`, but they have only run in local Docker, never on the real runner. Run this once, and again when either job's image or `tests/lint.sh` changes.
+
+- [ ] **[unverified]** A pipeline on any branch runs `shellcheck` and `hadolint` in stage `test`, both green. The `shellcheck` log shows `apk add` installing git, the `ok` line from `tests/lint-scripts.sh`, and `shellcheck 0.10.0 on <n> scripts`, where `<n>` equals `sh tests/lint.sh scripts | wc -l` on that commit. The `hadolint` log shows `hadolint 2.15.1 on image/Dockerfile`, the release `image/Dockerfile`'s `HADOLINT_IMAGE` pins.
+- [ ] **[unverified]** Each job fails its pipeline on a finding: on a scratch branch, add `local x=$(false)` inside a function of any bash script (shellcheck SC2155, a warning) and `RUN cd /tmp` to `image/Dockerfile` (hadolint DL3003). Both jobs go red. Delete the branch afterwards.
 
 ## Done
 

@@ -4,9 +4,15 @@
 #   tests/all.sh           every check this machine can run
 #   tests/all.sh --files   only the file checks (what the pipeline's `checks` job runs)
 #
-# The file checks (tests/ci.py, tests/repo.py, tests/update-pins.py, docs/check.sh)
-# always run; they need only bash and python3 with PyYAML. Each seam that needs tools runs only when they are present, and is
-# reported as SKIP otherwise, so a green run here says what it did not cover.
+# The linters (tests/lint.sh linters) run here when installed; the pipeline
+# runs them in jobs of their own, from pinned images.
+#
+# The file checks (tests/ci.py, tests/repo.py, tests/update-pins.py,
+# docs/check.sh) always run; they need only bash and python3 with PyYAML.
+# tests/lint-scripts.sh also needs git, which the checks job lacks, so the
+# pipeline runs it in the shellcheck job. Each seam that needs tools runs only
+# when they are present, and is reported as SKIP otherwise, so a green run here
+# says what it did not cover.
 set -uo pipefail
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$repo" || exit 1
@@ -26,9 +32,13 @@ run tests/ci.py "$py" tests/ci.py
 run tests/repo.py "$py" tests/repo.py
 run tests/update-pins.py "$py" tests/update-pins.py
 run docs/check.sh bash docs/check.sh
+if has git; then run tests/lint-scripts.sh sh tests/lint-scripts.sh; else skip tests/lint-scripts.sh git; fi
 
 if [[ ${1:-} == --files ]]; then :
 else
+    for lint in $(sh tests/lint.sh linters); do
+        if has "$lint"; then run "tests/lint.sh $lint" sh tests/lint.sh "$lint"; else skip "tests/lint.sh $lint" "$lint"; fi
+    done
     if docker_up; then
         run tests/image.sh bash tests/image.sh
         run tests/release.sh bash tests/release.sh

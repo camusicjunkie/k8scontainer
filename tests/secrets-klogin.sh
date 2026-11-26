@@ -24,7 +24,7 @@ export MSYS_NO_PATHCONV=1
 tmp=$(mktemp -d)
 hosttmp=$(cygpath -m "$tmp" 2>/dev/null || echo "$tmp")
 tag=$$
-vols=(devc-sk-hostkeys-$tag devc-sk-secrets-$tag devc-sk-kube-$tag devc-sk-personal-$tag)
+vols=("devc-sk-hostkeys-$tag" "devc-sk-secrets-$tag" "devc-sk-kube-$tag" "devc-sk-personal-$tag")
 cid=
 cleanup() {
     [[ -n $cid ]] && docker rm -f "$cid" >/dev/null 2>&1
@@ -76,7 +76,7 @@ chmod +x "$tmp/kubectl"
 
 # The Pod's mounts: state volumes at their paths, the Roster key list, Site Config.
 start_pod() { # prints the container id once sshd answers
-    local id i
+    local id _
     id=$(docker create --network none \
         -v "${vols[0]}:/var/lib/devc/hostkeys" \
         -v "${vols[1]}:/home/dev/.secrets" \
@@ -87,7 +87,7 @@ start_pod() { # prints the container id once sshd answers
         "$image") || return 1
     docker cp "$hosttmp/good.pub" "$id:/etc/devc/authorized_keys" >/dev/null || return 1
     docker start "$id" >/dev/null || return 1
-    for i in $(seq 40); do
+    for _ in $(seq 40); do
         docker exec "$id" bash -c 'exec 3<>/dev/tcp/127.0.0.1/2222' 2>/dev/null && { echo "$id"; return 0; }
         sleep 0.5
     done

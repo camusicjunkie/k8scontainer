@@ -104,8 +104,8 @@ start_sshd() { # prints the container id once sshd answers
     id=$(docker create --network none -v "$vol:/var/lib/devc/hostkeys" "$image") || return 1
     docker cp "$hosttmp/good.pub" "$id:/etc/devc/authorized_keys" >/dev/null || return 1
     docker start "$id" >/dev/null || return 1
-    local i
-    for i in $(seq 40); do
+    local _
+    for _ in $(seq 40); do
         docker exec "$id" bash -c 'exec 3<>/dev/tcp/127.0.0.1/2222' 2>/dev/null && { echo "$id"; return 0; }
         sleep 0.5
     done
