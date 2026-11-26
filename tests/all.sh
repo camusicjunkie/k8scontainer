@@ -4,8 +4,8 @@
 #   tests/all.sh           every check this machine can run
 #   tests/all.sh --files   only the file checks (what the pipeline's `checks` job runs)
 #
-# The file checks (tests/ci.py, tests/repo.py, docs/check.sh) always run; they
-# need only bash and python3 with PyYAML. Each seam that needs tools runs only when they are present, and is
+# The file checks (tests/ci.py, tests/repo.py, tests/update-pins.py, docs/check.sh)
+# always run; they need only bash and python3 with PyYAML. Each seam that needs tools runs only when they are present, and is
 # reported as SKIP otherwise, so a green run here says what it did not cover.
 set -uo pipefail
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -24,6 +24,7 @@ docker_up() { has docker && docker info >/dev/null 2>&1; }
 
 run tests/ci.py "$py" tests/ci.py
 run tests/repo.py "$py" tests/repo.py
+run tests/update-pins.py "$py" tests/update-pins.py
 run docs/check.sh bash docs/check.sh
 
 if [[ ${1:-} == --files ]]; then :

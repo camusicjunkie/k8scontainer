@@ -5,7 +5,7 @@
 # Not in this image yet: kubectl-vsphere (it needs a Supervisor's plugin zip).
 
 ARG DHI_BASE=dhi.io/debian-base:trixie-dev@sha256:f90fd43cdf3dd94840b4dc3a2a39fd2a08578e40e7895535e2e20a1275ba6013
-ARG BREW_IMAGE=docker.io/homebrew/brew:4.6.20@sha256:b0072bfdebf5934ae24b93b44a1928a88057399b3283ffa0177bb86084fdedfd
+ARG BREW_IMAGE=ghcr.io/homebrew/brew:4.6.20@sha256:b0072bfdebf5934ae24b93b44a1928a88057399b3283ffa0177bb86084fdedfd
 ARG HADOLINT_IMAGE=docker.io/hadolint/hadolint:v2.15.1-debian@sha256:9a3944b7fddcb947d1ffd90829ac1a6e5c30479223358f249d8b96c7d0019e27
 # The downloaded tools, each with the SHA-256 of its release asset. A stage
 # reads one with a bare `ARG <name>`, so its value is given here only.

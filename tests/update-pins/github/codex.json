@@ -1,0 +1,227 @@
+[
+ {
+  "tag_name": "rust-v0.174.0-alpha.7",
+  "draft": false,
+  "prerelease": true,
+  "assets": [
+   {
+    "name": "argument-comment-lint",
+    "digest": "sha256:608f9f5950ab58de382bf28b05b05d2b01e17b7d413bff248610740ad52a2a0c"
+   },
+   {
+    "name": "codex-x86_64-unknown-linux-musl.tar.gz",
+    "digest": "sha256:b4c44c14de01d1d4e3729921bf22e582cdff71069eae97ac64019e27365a2b37"
+   }
+  ]
+ },
+ {
+  "tag_name": "rust-v0.174.0-alpha.6",
+  "draft": false,
+  "prerelease": true,
+  "assets": [
+   {
+    "name": "argument-comment-lint",
+    "digest": "sha256:04e206096d848250d52e361e8a13020a1bad0ff8f41c6acfeb2c6249f30bb08c"
+   },
+   {
+    "name": "codex-x86_64-unknown-linux-musl.tar.gz",
+    "digest": "sha256:41f48c2177f6ac9cd0563595031bafcfb91d221def658da7aeee2398c9ff41c6"
+   }
+  ]
+ },
+ {
+  "tag_name": "rust-v0.174.0-alpha.5",
+  "draft": false,
+  "prerelease": true,
+  "assets": [
+   {
+    "name": "argument-comment-lint",
+    "digest": "sha256:65121a8394e5bd6bf9ea95d3b17806df203f08c339c2c2a36b440380f78aa48b"
+   },
+   {
+    "name": "codex-x86_64-unknown-linux-musl.tar.gz",
+    "digest": "sha256:dc1deda0c98204d73ebeb606bd965868609f3726ad12b4f202f337cde9e59aa4"
+   }
+  ]
+ },
+ {
+  "tag_name": "rust-v0.174.0-alpha.4",
+  "draft": false,
+  "prerelease": true,
+  "assets": [
+   {
+    "name": "argument-comment-lint",
+    "digest": "sha256:ea6fe56480ba198d81bbc62138ba622b55bcd4544d9df4ac4ed46dbd12e9aa25"
+   },
+   {
+    "name": "codex-x86_64-unknown-linux-musl.tar.gz",
+    "digest": "sha256:d682bb106ab6ab9c5c6ac7f15b350b4edb66b72a9b6e3c1c6ecba06773159809"
+   }
+  ]
+ },
+ {
+  "tag_name": "rust-v0.174.0-alpha.3",
+  "draft": false,
+  "prerelease": true,
+  "assets": [
+   {
+    "name": "argument-comment-lint",
+    "digest": "sha256:4553c9fc77de350a9459764afbfb3524efb4f988b79033e789f055639b2d3a55"
+   },
+   {
+    "name": "codex-x86_64-unknown-linux-musl.tar.gz",
+    "digest": "sha256:4c4730d0757dc2d70c49f6876cac8ed1eea8a3d3ba7e579c81da0ba550082898"
+   }
+  ]
+ },
+ {
+  "tag_name": "rust-v0.174.0-alpha.2",
+  "draft": false,
+  "prerelease": true,
+  "assets": [
+   {
+    "name": "argument-comment-lint",
+    "digest": "sha256:1b30657ca32cbf8d336295764fd162d28376a69cfe9a4bbeb391286f4dfcc7fc"
+   },
+   {
+    "name": "codex-x86_64-unknown-linux-musl.tar.gz",
+    "digest": "sha256:a90048ab3d35b0a2e442a0c829d2d18a005d0e82f23c755d988d77846941b8d1"
+   }
+  ]
+ },
+ {
+  "tag_name": "rust-v0.174.0-alpha.1",
+  "draft": false,
+  "prerelease": true,
+  "assets": [
+   {
+    "name": "argument-comment-lint",
+    "digest": "sha256:517d8b432066276ef56d9a23b3f1483e7ad93582005240284e2103b83a9b9fa1"
+   },
+   {
+    "name": "codex-x86_64-unknown-linux-musl.tar.gz",
+    "digest": "sha256:057a62706d59365ab806819046f1ab13e4bba7f7141bebd356c02e09d4858dca"
+   }
+  ]
+ },
+ {
+  "tag_name": "rust-v0.172.0",
+  "draft": false,
+  "prerelease": false,
+  "assets": [
+   {
+    "name": "argument-comment-lint",
+    "digest": "sha256:1a210bc9c49238a6b825642b26060f63a016ecc855133b569cadadd688fd49f7"
+   },
+   {
+    "name": "codex-x86_64-unknown-linux-musl.tar.gz",
+    "digest": "sha256:a2342a8f7f68f088be30620ccfe9cb84162c93a6b56177855961cda3ed6be392"
+   }
+  ]
+ },
+ {
+  "tag_name": "rust-v0.173.0-alpha.5",
+  "draft": false,
+  "prerelease": true,
+  "assets": [
+   {
+    "name": "argument-comment-lint",
+    "digest": "sha256:75958f0fd1d50100825bc0fece1b1efd630f55a28b455b549d5ad286928220cb"
+   },
+   {
+    "name": "codex-x86_64-unknown-linux-musl.tar.gz",
+    "digest": "sha256:c55e8c04fb4d043389de529d393d5c98e9c40efcd7194a2a8c16efca6aaadb23"
+   }
+  ]
+ },
+ {
+  "tag_name": "rust-v0.172.0-alpha.2.1",
+  "draft": false,
+  "prerelease": true,
+  "assets": [
+   {
+    "name": "argument-comment-lint",
+    "digest": "sha256:701bdcc9c2458ea3e2626f52aedf009d142558e3e72f12a6e05d480f9308a11a"
+   },
+   {
+    "name": "codex-x86_64-unknown-linux-musl.tar.gz",
+    "digest": "sha256:4c82f9f31e25da15e0d3bb90fceaa7ba57839e504941ae5d58539c5b0bab84f2"
+   }
+  ]
+ },
+ {
+  "tag_name": "rust-v0.171.0-alpha.13.2",
+  "draft": false,
+  "prerelease": true,
+  "assets": [
+   {
+    "name": "argument-comment-lint",
+    "digest": "sha256:9c753e8810007befdaa407ff4bd692f388db806dff33d3c1216d09c2443b8da6"
+   },
+   {
+    "name": "codex-x86_64-unknown-linux-musl.tar.gz",
+    "digest": "sha256:0d03a09fab9e6d44ae59b9030a02925f5c7d9c8a121dd6003c11217f87a48811"
+   }
+  ]
+ },
+ {
+  "tag_name": "rust-v0.173.0-alpha.4",
+  "draft": false,
+  "prerelease": true,
+  "assets": [
+   {
+    "name": "argument-comment-lint",
+    "digest": "sha256:fbe67643ca5e150997e749cdd1bbb87ff0e4e2b876d1018f767ef42fd9670c93"
+   },
+   {
+    "name": "codex-x86_64-unknown-linux-musl.tar.gz",
+    "digest": "sha256:a8b725de7c3236082f4ec7ad8ea88abc9cc07764bc9077c6b08c6e830e956ec9"
+   }
+  ]
+ },
+ {
+  "tag_name": "rust-v0.173.0-alpha.3",
+  "draft": false,
+  "prerelease": true,
+  "assets": [
+   {
+    "name": "argument-comment-lint",
+    "digest": "sha256:81d3df35f908a971afb4c5f008a944d8b74bee6cdb679d4d9ba6a0ef3da40bef"
+   },
+   {
+    "name": "codex-x86_64-unknown-linux-musl.tar.gz",
+    "digest": "sha256:3578c33c27bdc27a8b9a2f70e0af87d3bdecf5eb65e3a19806d4f5d249b10680"
+   }
+  ]
+ },
+ {
+  "tag_name": "rust-v0.173.0-alpha.2",
+  "draft": false,
+  "prerelease": true,
+  "assets": [
+   {
+    "name": "argument-comment-lint",
+    "digest": "sha256:f3840f54120df8d3cde14217cf2b42d65386e1be78d85a979d98e441f0d6a1ff"
+   },
+   {
+    "name": "codex-x86_64-unknown-linux-musl.tar.gz",
+    "digest": "sha256:9c9ef96cf73424ebb0055add93823bb91c82c482e099e1681e35a88641e0b773"
+   }
+  ]
+ },
+ {
+  "tag_name": "rust-v0.173.0-alpha.1",
+  "draft": false,
+  "prerelease": true,
+  "assets": [
+   {
+    "name": "argument-comment-lint",
+    "digest": "sha256:bc1c8722ecf9da81a3fdc99c680e58cc6e7291a4ddcac4580d625c843c01aafe"
+   },
+   {
+    "name": "codex-x86_64-unknown-linux-musl.tar.gz",
+    "digest": "sha256:d27878741598e44dfec0155e3b07deada90b5886027970cb4402383ef0577788"
+   }
+  ]
+ }
+]

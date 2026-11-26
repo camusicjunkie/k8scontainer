@@ -1,0 +1,11 @@
+{
+ "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/661626d0e72f97806550790a98fb87116c9db825/vscode-server-linux-x64.tar.gz",
+ "name": "1.148.0",
+ "version": "661626d0e72f97806550790a98fb87116c9db825",
+ "productVersion": "1.148.0",
+ "hash": "6518fde4a3c8bfa27fbcc862abcef92a53b2cc75",
+ "timestamp": 1795524073017,
+ "sha256hash": "4d1e2a075a35c177e583625196c7ce18271fe18a6f138f6bec5ad76b4cb4ec9e",
+ "supportsFastUpdate": true,
+ "notes": "661626d0e72f97806550790a98fb87116c9db825"
+}

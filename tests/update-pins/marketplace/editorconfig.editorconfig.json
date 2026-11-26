@@ -1,0 +1,124 @@
+{
+ "results": [
+  {
+   "extensions": [
+    {
+     "publisher": {
+      "publisherName": "EditorConfig"
+     },
+     "extensionName": "EditorConfig",
+     "versions": [
+      {
+       "version": "0.18.2",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.100.0"
+        }
+       ]
+      },
+      {
+       "version": "0.18.1",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.100.0"
+        }
+       ]
+      },
+      {
+       "version": "0.18.0",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.100.0"
+        }
+       ]
+      },
+      {
+       "version": "0.17.4",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.98.0"
+        }
+       ]
+      },
+      {
+       "version": "0.17.3",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.98.0"
+        }
+       ]
+      },
+      {
+       "version": "0.17.2",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.90.0"
+        }
+       ]
+      },
+      {
+       "version": "0.17.1",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.82.0"
+        }
+       ]
+      },
+      {
+       "version": "0.17.0",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.82.0"
+        }
+       ]
+      },
+      {
+       "version": "0.16.7",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.82.0"
+        }
+       ]
+      },
+      {
+       "version": "0.16.4",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.51.1"
+        }
+       ]
+      },
+      {
+       "version": "0.16.3",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.51.1"
+        }
+       ]
+      },
+      {
+       "version": "0.16.2",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.51.1"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

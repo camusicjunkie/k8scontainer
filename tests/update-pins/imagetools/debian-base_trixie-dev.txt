@@ -1,0 +1,3 @@
+Name:      dhi.io/debian-base:trixie-dev
+MediaType: application/vnd.oci.image.index.v1+json
+Digest:    sha256:120051dda16c2611454d2c54a0959f23f80c32493d0e528a5d1348bca82dfbc8
