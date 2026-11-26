@@ -44,8 +44,10 @@ UPDATE_API = "https://update.code.visualstudio.com/api"
 MARKETPLACE = "https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery"
 GITHUB_API = "https://api.github.com/repos"
 REMOTE_SSH = "ms-vscode-remote.remote-ssh"
-# The platforms a VSIX may target and still install on the image's server.
-LINUX_TARGETS = (None, "universal", "linux-x64")
+# The platforms a VSIX may target and still install where it goes: the extensions on
+# the image's VS Code server, Remote-SSH on the Workstation's portable VS Code.
+SERVER_TARGETS = (None, "universal", "linux-x64")
+WORKSTATION_TARGETS = (None, "universal", "win32-x64")
 PAGE = 30   # a Codex release has ~200 assets; bigger pages time out
 PAGES = 5
 
@@ -83,6 +85,21 @@ def buildx():
     return subprocess.run(["docker", "buildx", "version"], capture_output=True).returncode == 0
 
 
+def docker_config():
+    return Path(os.environ.get("DOCKER_CONFIG") or Path.home() / ".docker") / "config.json"
+
+
+def logged_in(config, registry):
+    """Whether the Docker config holds credentials for `registry`: an `auths` entry (which
+    `docker login` writes even when a `credsStore` keeps the secret) or a `credHelpers` one."""
+    try:
+        conf = json.loads(Path(config).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    hosts = [*conf.get("auths", {}), *conf.get("credHelpers", {})]
+    return any(re.sub(r"^\w+://|/.*$", "", h) == registry for h in hosts)
+
+
 # ------------------------------------------------------------------ versions
 def version_key(v):
     m = re.match(r"(\d+)\.(\d+)\.(\d+)", v)
@@ -90,18 +107,32 @@ def version_key(v):
 
 
 def engine_accepts(engine, vscode):
-    """Whether a Marketplace `engines.vscode` range admits a VS Code version."""
+    """Whether a Marketplace `engines.vscode` range admits a VS Code version, by VS Code's own
+    rule (src/vs/platform/extensions/common/extensionValidator.ts): `*`, or an optional `^` or
+    `>=` before major.minor.patch, each part a number or `x`. A bare version is exact; `^`
+    frees the parts after the major (after the minor for 0.x), and 0.x ranges admit 1.x.
+    VS Code refuses any other form, or none, so such a version is never taken. A `-<date>`
+    suffix, which VS Code checks against its build date, is ignored."""
     engine = (engine or "").strip()
-    if engine in ("*", ""):
-        return engine == "*"
-    m = re.fullmatch(r"(\^|>=)?\s*(\d+)\.(\d+|x)(?:\.(\d+|x))?(?:-[\w.]+)?", engine)
+    if engine == "*":
+        return True
+    m = re.fullmatch(r"(\^|>=)?(\d+|x)\.(\d+|x)\.(\d+|x)(?:-.*)?", engine)
     if not m:
         return False
-    least = tuple(0 if p in (None, "x") else int(p) for p in m.groups()[1:])
+    parts = m.groups()[1:]
+    want = [0 if p == "x" else int(p) for p in parts]
+    exact = [p != "x" for p in parts]   # whether a higher VS Code part is refused
     have = version_key(vscode)
     if m[1] == ">=":
-        return have >= least
-    return have >= least and (least[0] == 0 or have[0] == least[0])
+        return have >= tuple(want)
+    if m[1] == "^":
+        exact[1:] = [exact[1] and want[0] == 0, False]
+    if have[0] == 1 and want[0] == 0 and not all(exact):
+        want, exact = [1, 0, 0], [True, False, False]
+    for h, w, e in zip(have, want, exact):
+        if h != w:
+            return h > w and not e
+    return True
 
 
 def major_jump(old, new):
@@ -127,7 +158,7 @@ def newest_vscode(fetch):
     return found
 
 
-def newest_extension(fetch, ext, vscode):
+def newest_extension(fetch, ext, vscode, targets=SERVER_TARGETS):
     body = json.dumps({"filters": [{"criteria": [{"filterType": 7, "value": ext}], "pageSize": 1}],
                        "flags": 0x1 | 0x10}).encode()   # versions, with their properties
     found = fetch(MARKETPLACE, body)["results"][0]["extensions"]
@@ -136,7 +167,7 @@ def newest_extension(fetch, ext, vscode):
     best = None
     for v in found[0]["versions"]:
         props = {p["key"]: p["value"] for p in v.get("properties", [])}
-        if v.get("targetPlatform") not in LINUX_TARGETS \
+        if v.get("targetPlatform") not in targets \
                 or props.get("Microsoft.VisualStudio.Code.PreRelease") == "true" \
                 or not engine_accepts(props.get("Microsoft.VisualStudio.Code.Engine"), vscode):
             continue
@@ -148,17 +179,25 @@ def newest_extension(fetch, ext, vscode):
 
 
 def newest_release(fetch, repo, tag_pattern, pin):
-    """The highest non-prerelease release whose tag fits `tag_pattern` (one group: the version)."""
-    seen = []
+    """The highest non-prerelease release whose tag fits `tag_pattern` (one group: the version),
+    as (version, release). GitHub lists releases newest first, and a servicing release of an
+    older line can be listed above a higher version, so pages are read until one brings no
+    higher version than those before it (or the list ends, or PAGES are read)."""
+    best = None
     for page in range(1, PAGES + 1):
         releases = fetch(f"{GITHUB_API}/{repo}/releases?per_page={PAGE}&page={page}")
-        seen += [(m[1], r) for r in releases if not r["draft"] and not r["prerelease"]
-                 and (m := re.fullmatch(tag_pattern, r["tag_name"]))]
-        if seen or len(releases) < PAGE:
+        stable = [(m[1], r) for r in releases if not r["draft"] and not r["prerelease"]
+                  and (m := re.fullmatch(tag_pattern, r["tag_name"]))]
+        top = max(stable, key=lambda s: version_key(s[0]), default=None)
+        if top and (not best or version_key(top[0]) > version_key(best[0])):
+            best = top
+        elif best:
             break
-    if not seen:
+        if len(releases) < PAGE:
+            break
+    if not best:
         raise LookupFailed(pin, f"no stable release of {repo} with a tag like {tag_pattern}")
-    return max(seen, key=lambda s: version_key(s[0]))
+    return best
 
 
 def image_digest(imagetools, ref, pin):
@@ -216,7 +255,8 @@ def read_extensions(text):
     return re.findall(r"^([\w.-]+)@([^\s#]+)", text, re.M)
 
 
-def main(argv=None, root=ROOT, fetch=fetch, imagetools=imagetools, buildx=buildx, out=sys.stdout, err=sys.stderr):
+def main(argv=None, root=ROOT, fetch=fetch, imagetools=imagetools, buildx=buildx, docker_config=None,
+         out=sys.stdout, err=sys.stderr):
     argv = sys.argv[1:] if argv is None else argv
     if any(a in ("-h", "--help") for a in argv):
         print(__doc__.strip(), file=out)
@@ -230,6 +270,9 @@ def main(argv=None, root=ROOT, fetch=fetch, imagetools=imagetools, buildx=buildx
     if needs_docker and not buildx():
         print(f"the {', '.join(needs_docker)} group(s) need `docker buildx` (logged in to dhi.io for dhi): "
               f"install Docker's buildx plugin, or run only the other groups", file=err)
+        return 1
+    if "dhi" in groups and not logged_in(docker_config or globals()["docker_config"](), "dhi.io"):
+        print("the dhi group needs this host's `docker login dhi.io`: log in, or run only the other groups", file=err)
         return 1
 
     paths = {f: Path(root) / f for f in (VSCODE_ENV, EXTENSIONS, DOCKERFILE)}
@@ -246,7 +289,7 @@ def main(argv=None, root=ROOT, fetch=fetch, imagetools=imagetools, buildx=buildx
             new = newest_vscode(fetch)
             vscode = new["VSCODE_VERSION"]
             pin = "VSCODE_REMOTE_SSH_VERSION"
-            new[pin] = newest_extension(fetch, REMOTE_SSH, vscode)
+            new[pin] = newest_extension(fetch, REMOTE_SSH, vscode, WORKSTATION_TARGETS)
             changes += [(VSCODE_ENV, k, env.get(k), v) for k, v in new.items()]
         if "extensions" in groups:
             for pin, old in read_extensions(before[EXTENSIONS]):
