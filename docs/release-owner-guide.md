@@ -35,8 +35,16 @@ The zip is fetched without TLS verification (Supervisors usually carry their own
 
 ## Before each Release
 
-- **Refresh the DHI base digest.** `image/Dockerfile` pins the base (`DHI_BASE`) by digest. Its apt repository keeps moving, so a stale digest can make package installs fail. Get the current digest, for example `docker buildx imagetools inspect dhi.io/debian-base:trixie-dev`, and update the `ARG DHI_BASE=` line. Do this every Release.
-- **Check the other pins.** The VS Code commit and its checksums are in `image/packages/vscode.env`, extensions in `image/packages/vscode-extensions.txt`; both move only with a Release, and the Workstation pack must match them (below).
+- **Refresh the pins.** Do this every Release: the DHI base's apt repository keeps moving, so a stale `DHI_BASE` digest can make package installs fail. On the Connected Side's Linux Docker host, in a clone at the Release branch:
+
+  ```bash
+  docker login dhi.io
+  python3 release/update-pins.py
+  git diff                     # review, then commit and push
+  docker logout dhi.io
+  ```
+
+  `release/update-pins.py` looks up the newest version of every exact pin and rewrites the pin files, with each checksum taken from its publisher: the VS Code version, commit, SHA-256s and Remote-SSH version (`VSCODE_REMOTE_SSH_VERSION`) in `image/packages/vscode.env`; the extensions in `image/packages/vscode-extensions.txt`, each the newest stable version that VS Code accepts; and in `image/Dockerfile`, `DHI_BASE`'s digest, `BREW_IMAGE` and `HADOLINT_IMAGE` at their newest release, and Codex, tflint and pwsh with their SHA-256s. It prints each change (a major version jump is flagged) and builds, commits and pushes nothing. Name groups to refresh only some (`vscode`, `extensions`, `dhi`, `brew`, `hadolint`, `codex`, `tflint`, `pwsh`), for example `python3 release/update-pins.py codex`. A failed lookup writes nothing and names the pin; rerun with the other groups. Only `dhi`, `brew` and `hadolint` need `docker buildx` and the `dhi.io` login; `GITHUB_TOKEN` is used when set but is not needed. Skip the `docker logout` if the host keeps credentials in a credential helper (`credsStore` in `~/.docker/config.json`): without one, `docker login` leaves the token base64-encoded, in effect plain text, in that file. The pins move only with a Release, and the Workstation pack must match `vscode.env` (below). The Release build and its self-test are what prove the new pins.
 - **Optional local check** (Docker needed): `bash tests/image.sh` builds the image and runs the self-test with no network. The pipeline runs the same self-test, `devc-selftest`, with no network, as a gate.
 
 ## Cutting a Release
@@ -64,7 +72,7 @@ The zip is fetched without TLS verification (Supervisors usually carry their own
    | `vscode.env` | a copy of `image/packages/vscode.env` |
    | `release.json` | `version` (the Release), `vscode` with `version`, `commit` and `zip` (file name), and `extensions`: exactly one entry with `id` `ms-vscode-remote.remote-ssh`, `version` and `file` (the VSIX file name) |
    | the portable VS Code zip | the Windows x64 archive for that commit; its SHA-256 must equal `VSCODE_WIN_SHA256` in `vscode.env` |
-   | the Remote-SSH VSIX | the one extension the installer installs; its version is not pinned anywhere in this repository, so choose one that works with that VS Code and record it in `release.json` |
+   | the Remote-SSH VSIX | the one extension the installer installs, at the version `VSCODE_REMOTE_SSH_VERSION` in `vscode.env` pins; record it in `release.json` |
    | `SHA256SUMS` | `sha256sum` format (`<hash>  <relative path>`), covering every file above except `install.ps1` and `SHA256SUMS` itself |
 
    The installer refuses the pack if any covered file is missing or mismatched, if a file it uses is not covered, if `release.json`'s VS Code commit or version differs from `vscode.env`, if the zip is not the pinned one, or if the Release carries any extension other than Remote-SSH. Run `install.ps1` once on a test Workstation before carrying the pack. **Unverified:** a real portable VS Code download and `code.cmd`, installing the real VSIX offline, and the real Remote-SSH version check.
