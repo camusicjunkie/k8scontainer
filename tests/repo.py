@@ -7,7 +7,8 @@ Reads files only, so it needs no Docker, cluster or network. Checks:
   1. every Pod-side path the image uses is one the Pod provides (a mount, under
      a mount, or a parent of one) or one the image ships itself;
   2. every base image in image/Dockerfile is pinned by digest, and every stage
-     but the hadolint and brew builders is on the DHI base;
+     but the hadolint and brew builders is on the DHI base, and the final
+     stage's USER uid:gid is the ResourceSet's runAsUser and runAsGroup;
   3. no GLOSSARY.md _Avoid_ term in code comments;
   4. no resolved ticket has an acceptance item left open without `[unverified]`.
 """
@@ -81,6 +82,17 @@ check("DHI_BASE is the DHI debian-base", args.get("DHI_BASE", "").startswith("dh
 BUILDERS = {"HADOLINT_IMAGE": "hadolint", "BREW_IMAGE": "brew"}
 off_dhi = [f"{stage or 'final'} on {a}" for a, stage in bases if a != "DHI_BASE" and BUILDERS.get(a) != stage]
 check("every stage but the hadolint and brew builders is on DHI_BASE", not off_dhi, ", ".join(off_dhi))
+
+# 2b. The Standard Image's user. The final stage's numeric USER lets a kubelet
+# verify runAsNonRoot from the image; the ResourceSet runs the Pod as the same
+# uid and gid, or the home directory and the volumes' ownership disagree.
+final_stage = re.split(r"^FROM\s", dockerfile, flags=re.M | re.I)[-1]
+image_user = re.findall(r"^USER\s+(\d+):(\d+)\s*$", final_stage, re.M)
+pod_user = {(k, v) for k, v in re.findall(r"^\s*(runAsUser|runAsGroup):\s*(\d+)\s*$", resourceset, re.M)}
+want_user = {("runAsUser", image_user[-1][0]), ("runAsGroup", image_user[-1][1])} if image_user else set()
+check("the ResourceSet's runAsUser and runAsGroup are the final stage's USER uid:gid",
+      bool(image_user) and {k for k, _ in pod_user} == {"runAsUser", "runAsGroup"} and pod_user == want_user,
+      f"image USER {':'.join(image_user[-1]) if image_user else 'not numeric uid:gid'}, Pod {sorted(pod_user)}")
 
 # 3. Glossary terms in code comments. A term counts only standing alone, so tool
 # and file names that embed it (ansible-vault, devc-vault-pass, ~/.secrets/vault)

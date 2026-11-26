@@ -16,7 +16,8 @@ import yaml
 
 CI = Path(__file__).resolve().parent.parent / ".gitlab-ci.yml"
 DOCKERFILE = CI.parent / "image/Dockerfile"
-LINTERS = ("shellcheck", "hadolint")
+# tests/lint.sh's LINTERS line, so a linter added there needs its job here.
+LINTERS = tuple(re.search(r'^LINTERS="([^"]*)"', (CI.parent / "tests/lint.sh").read_text(), re.M).group(1).split())
 TOKEN = re.compile(r'\s*(&&|\|\||==|!=|=~|!~|\$\w+|"[^"]*"|/(?:\\/|[^/])*/|\(|\)|null)')
 
 
@@ -109,15 +110,28 @@ def jobs_for(cfg, env):
     return ran
 
 
+# The jobs every ref runs; a Release tag adds publish.
+EVERY_REF = {"build", "selftest", "checks", *LINTERS}
 REFS = {
-    "push to main": ({"CI_COMMIT_BRANCH": "main", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks", *LINTERS}),
-    "push to a feature branch": ({"CI_COMMIT_BRANCH": "feat/x", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks", *LINTERS}),
-    "merge request": ({"CI_PIPELINE_SOURCE": "merge_request_event", "CI_MERGE_REQUEST_IID": "3"}, {"build", "selftest", "checks", *LINTERS}),
-    "Release tag v1.2.3": ({"CI_COMMIT_TAG": "v1.2.3", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks", *LINTERS, "publish"}),
-    "Release tag 2026.11.2": ({"CI_COMMIT_TAG": "2026.11.2", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks", *LINTERS, "publish"}),
-    "non-Release tag 'wip'": ({"CI_COMMIT_TAG": "wip", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks", *LINTERS}),
-    "tag 'v1.2.3-oops'": ({"CI_COMMIT_TAG": "v1.2.3-oops", "CI_PIPELINE_SOURCE": "push"}, {"build", "selftest", "checks", *LINTERS}),
+    "push to main": ({"CI_COMMIT_BRANCH": "main", "CI_PIPELINE_SOURCE": "push"}, EVERY_REF),
+    "push to a feature branch": ({"CI_COMMIT_BRANCH": "feat/x", "CI_PIPELINE_SOURCE": "push"}, EVERY_REF),
+    "merge request": ({"CI_PIPELINE_SOURCE": "merge_request_event", "CI_MERGE_REQUEST_IID": "3"}, EVERY_REF),
+    "Release tag v1.2.3": ({"CI_COMMIT_TAG": "v1.2.3", "CI_PIPELINE_SOURCE": "push"}, EVERY_REF | {"publish"}),
+    "Release tag 2026.11.2": ({"CI_COMMIT_TAG": "2026.11.2", "CI_PIPELINE_SOURCE": "push"}, EVERY_REF | {"publish"}),
+    "non-Release tag 'wip'": ({"CI_COMMIT_TAG": "wip", "CI_PIPELINE_SOURCE": "push"}, EVERY_REF),
+    "tag 'v1.2.3-oops'": ({"CI_COMMIT_TAG": "v1.2.3-oops", "CI_PIPELINE_SOURCE": "push"}, EVERY_REF),
 }
+
+
+def image_of(cfg, name):
+    """The image reference job `name` runs in, from `image:` or `image: name:`."""
+    job = cfg.get(name)
+    ref = job.get("image") if isinstance(job, dict) else None
+    if isinstance(ref, dict):
+        ref = ref.get("name")
+    if not ref:
+        raise SystemExit(f"tests/ci.py: job {name!r} has no image in .gitlab-ci.yml")
+    return str(ref)
 
 failed = []
 
@@ -170,12 +184,16 @@ else:
               job.get("stage") == cfg.get("checks", {}).get("stage")
               and f"tests/lint.sh {lint}" in "\n".join(job.get("script", [])))
         check(f"publish waits on {lint}", lint in publish_needs)
-    image = lambda j: str(j.get("image", {}).get("name") if isinstance(j.get("image"), dict) else j.get("image"))
     pin = re.search(r"^ARG HADOLINT_IMAGE=(\S+)", DOCKERFILE.read_text(), re.M)
     check("the hadolint job uses the image the Dockerfile's HADOLINT_IMAGE pins",
-          pin is not None and image(cfg.get("hadolint", {})) == pin.group(1),
-          f"{image(cfg.get('hadolint', {}))} vs {pin and pin.group(1)}")
-    check("the shellcheck job's image is pinned by digest", "@sha256:" in image(cfg.get("shellcheck", {})))
+          pin is not None and image_of(cfg, "hadolint") == pin.group(1),
+          f"{image_of(cfg, 'hadolint')} vs {pin and pin.group(1)}")
+    check("the shellcheck job's image is pinned by digest", "@sha256:" in image_of(cfg, "shellcheck"))
+    # tests/lint.sh lists scripts with git ls-files; the shellcheck image has no git.
+    shellcheck = "\n".join(cfg.get("shellcheck", {}).get("script", []))
+    check("the shellcheck job installs git and runs tests/lint-scripts.sh before the lint",
+          re.search(r"apk add [^\n]*\bgit\b[\s\S]*tests/lint-scripts\.sh[\s\S]*tests/lint\.sh shellcheck", shellcheck)
+          is not None)
     check("Harbor credentials appear only in the publish job", all(
         "HARBOR" not in yaml.dump(j) for n, j in cfg.items() if isinstance(j, dict) and n != "publish"))
     candidate = str(cfg.get("variables", {}).get("CANDIDATE", ""))

@@ -96,6 +96,13 @@ Record the date, the Release version, who ran it, the result of every step and a
 - [ ] The Pod cannot reach the Kubernetes API with credentials (none are mounted), and A's session cannot read B's volume paths.
 - [ ] No Internet is needed anywhere above: the VS Code server, extensions and Release came from the image and the Registry.
 
+## 10. The pipeline's linter jobs
+
+On the Connected Side's GitLab, not the Disconnected Side: `tests/ci.py` checks the `shellcheck` and `hadolint` jobs in `.gitlab-ci.yml`, but they have only run in local Docker, never on the real runner. Run this once, and again when either job's image or `tests/lint.sh` changes.
+
+- [ ] **[unverified]** A pipeline on any branch runs `shellcheck` and `hadolint` in stage `test`, both green. The `shellcheck` log shows `apk add` installing git, the `ok` line from `tests/lint-scripts.sh`, and `shellcheck 0.10.0 on <n> scripts`, where `<n>` equals `sh tests/lint.sh scripts | wc -l` on that commit. The `hadolint` log shows `hadolint 2.15.1 on image/Dockerfile`, the release `image/Dockerfile`'s `HADOLINT_IMAGE` pins.
+- [ ] **[unverified]** Each job fails its pipeline on a finding: on a scratch branch, add `local x=$(false)` inside a function of any bash script (shellcheck SC2155, a warning) and `RUN cd /tmp` to `image/Dockerfile` (hadolint DL3003). Both jobs go red. Delete the branch afterwards.
+
 ## Done
 
 Record the results with the Release. Any failure blocks the Release until it is fixed (as the next version if the fix changes the Release). Items that stayed unverified because the capability does not exist yet (the `kubectl-vsphere` plugin) are recorded as known gaps, not passes.

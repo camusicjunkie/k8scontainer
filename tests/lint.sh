@@ -4,6 +4,8 @@
 #
 #   tests/lint.sh shellcheck
 #   tests/lint.sh hadolint
+#   tests/lint.sh scripts      list the files shellcheck gets
+#   tests/lint.sh linters      list the linters, one per line
 #
 # POSIX sh, so the pipeline runs it straight from the linters' own images
 # (alpine and debian, neither with bash). tests/all.sh runs each linter only
@@ -11,13 +13,21 @@
 set -eu
 cd "$(dirname "$0")/.."
 
-# A shell script is a *.sh file or a file whose shebang names sh or bash, which
-# catches the extensionless commands under image/rootfs/usr/local/bin.
+# The one list of linters: tests/all.sh runs these, and tests/ci.py reads this
+# line for the pipeline jobs it expects.
+LINTERS="shellcheck hadolint"
+
+# A shell script is a tracked *.sh file or a tracked file whose shebang names
+# sh, bash or dash (directly or through env, -S too), which catches the
+# extensionless commands under image/rootfs/usr/local/bin. git ls-files, not
+# find, so untracked trees (an agent's .claude/worktrees) are left alone. The
+# CR is dropped so a CRLF script is found, and shellcheck reports its endings.
 shell_scripts() {
-    find . -path ./.git -prune -o -type f -print | sort | while IFS= read -r f; do
+    git -c safe.directory="$PWD" -c core.quotepath=off ls-files | sort | while IFS= read -r f; do
+        [ -f "$f" ] || continue
         case $f in
             *.sh) echo "$f" ;;
-            *) if head -n 1 "$f" | grep -Eq '^#! *(/usr)?/bin/(env +)?(ba)?sh( |$)'; then echo "$f"; fi ;;
+            *) if head -n 1 "$f" | tr -d '\r' | grep -Eq '^#! *(/usr)?/bin/(env +(-S +)?)?(ba|da)?sh( |$)'; then echo "$f"; fi ;;
         esac
     done
 }
@@ -28,6 +38,12 @@ pinned_hadolint() {
 }
 
 case ${1:-} in
+scripts)
+    shell_scripts
+    ;;
+linters)
+    printf '%s\n' $LINTERS
+    ;;
 shellcheck)
     list=$(shell_scripts)
     [ -n "$list" ] || { echo "no shell scripts found" >&2; exit 1; }
@@ -47,7 +63,7 @@ hadolint)
     hadolint image/Dockerfile
     ;;
 *)
-    echo "usage: tests/lint.sh shellcheck|hadolint" >&2
+    echo "usage: tests/lint.sh shellcheck|hadolint|scripts|linters" >&2
     exit 2
     ;;
 esac

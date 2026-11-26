@@ -41,16 +41,23 @@ for d in "${docs[@]}"; do
     done < <(grep -o '`[^`]*`' "$d" | tr -d '`' | sort -u)
 done
 
-# AGENTS.md's paths: every backticked relative path exists. A path whose first
+# AGENTS.md's paths: every backticked relative path exists, a command with
+# arguments (`tests/all.sh --files`) by its first word. A path whose first
 # segment is in this repository is checked here; any other is a Gitops
 # repository path, checked in its checkout (GITOPS_DIR, else Gitops beside the
 # main checkout), and reported as skipped when there is none (CI).
-gitops=${GITOPS_DIR:-$(dirname "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo "$repo/.git")")")/Gitops}
+gitops_checkout() { # the Gitops checkout beside the main checkout, which a worktree shares
+    local common
+    common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo "$repo/.git")
+    echo "$(dirname "$(dirname "$common")")/Gitops"
+}
+gitops=${GITOPS_DIR:-$(gitops_checkout)}
 gitops_skipped=()
 while read -r p; do
+    p=${p%% *}
     p=${p%/}
     case $p in
-        *'<'* | *'*'* | *' '* | *'\'* | http* | github.com/* | /* | '~'* | -*) continue ;;
+        *'<'* | *'*'* | *'\'* | http* | github.com/* | /* | '~'* | -*) continue ;;
     esac
     [[ $p == */* || $p == *.md || $p == *.sh ]] || continue
     if [[ -e ${p%%/*} ]]; then

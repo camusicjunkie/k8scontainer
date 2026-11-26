@@ -9,7 +9,7 @@
 - [x] shellcheck runs at warning severity on every shell script in the repository, including the extensionless scripts in the image's root filesystem (found by their shebang, not their name)
 - [x] hadolint runs on the Standard Image's Dockerfile, at the same version the Dockerfile's `HADOLINT_IMAGE` pins (older versions reject `ADD --checksum`); the version is read from that pin, not typed again
 - [x] In `tests/all.sh`, each linter is a seam that runs when its tool is present and reports SKIP otherwise, as the other seams do
-- [x] The pipeline runs both linters in its `checks` stage from pinned images, so CI never skips them
+- [ ] The pipeline runs both linters in its `checks` stage from pinned images, so CI never skips them **[unverified]** (e2e section 10: the linter jobs on a GitLab runner)
 - [x] Every current finding is fixed, or ignored inline with its reason. On 2026-11-26 shellcheck 0.10.0 reported 15 warnings (SC2034, SC2120, SC2154, SC2155, SC2206) and hadolint 2.15.1 reported DL3066
 - [x] `tests/all.sh --files` passes
 
@@ -26,3 +26,10 @@
 - **Decision (Dockerfile):** DL3066 is fixed, not ignored: the final stage is `USER 1000:1000` instead of `USER dev`, so a kubelet can verify `runAsNonRoot` from the image alone. Same user (dev is 1000:1000), and the ResourceSet already sets `runAsUser: 1000`.
 - Fixes: unused loop counters renamed `_` (SC2034); `pod_ready` lost the timeout parameter no caller passed (SC2120); `local`/`export` with a command substitution split into declare then assign (SC2155); the volume names in `tests/secrets-klogin.sh` quoted (SC2206).
 - Run here: shellcheck 0.10.0 (`koalaman/shellcheck-alpine:v0.10.0`, the release the image's apt ships) and hadolint 2.15.1 (the `HADOLINT_IMAGE` digest) both clean, run in Docker with the tree piped in by tar. `tests/all.sh --files` passes. The image rebuilt with `USER 1000:1000` passes `tests/image.sh` (16 cases, user reported as `1000:1000`). The new jobs have not run on a GitLab runner.
+
+**Review (2026-11-27):**
+
+- The pipeline item is open again and marked **[unverified]**: the jobs never ran on a GitLab runner. `docs/e2e-checklist.md` section 10 says how to verify them there.
+- `tests/lint.sh` lists candidates with `git ls-files`, not `find`, so untracked trees such as `.claude/worktrees/` are no longer linted. The shebang match also takes `env -S bash`, `dash` and CRLF endings (shellcheck then reports the endings). `tests/lint-scripts.sh` checks the list against a scratch git repository with known files; red first against the old `tests/lint.sh`. `tests/all.sh --files` runs it where git is installed. The checks job's image has no git, so the `shellcheck` job installs git (`apk add`) and runs it before the lint, which `tests/ci.py` checks.
+- `tests/lint.sh linters` is the one list of linters: `tests/all.sh` loops over it and `tests/ci.py` reads its `LINTERS` line.
+- `tests/repo.py` checks the final stage's `USER 1000:1000` against the ResourceSet's `runAsUser` and `runAsGroup` (seen red with `runAsGroup: 1001`).
