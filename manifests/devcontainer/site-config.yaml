@@ -1,0 +1,15 @@
+# Site Config for this network: the read-only settings and CAs every
+# Devcontainer Pod gets. Both come from the network's runtime facts, base64 so
+# multi-line values survive substitution (the Gitops repository's bootstrap
+# writes them from its devcontainer_site_env and devcontainer_site_ca
+# variables). Nothing network-specific is committed; tests/site holds the
+# values the tests and kind use.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: site-config
+  namespace: devcontainer
+binaryData:
+  # klogin and codex read these (see image/rootfs/usr/local/bin/klogin).
+  site.env: ${DEVCONTAINER_SITE_ENV_B64}
+  site-ca.crt: ${DEVCONTAINER_SITE_CA_B64}

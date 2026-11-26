@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# devc-entrypoint: refreshes the trust store from Site Config, then runs the
+# container's command. Nothing in the image needs root, so it refuses to start
+# as root. A failed refresh is reported but never stops the start.
+if [[ $(id -u) -eq 0 ]]; then
+    echo "devc-entrypoint: refusing to start as root; the Standard Image runs as its non-root user" >&2
+    exit 1
+fi
+devc-ca-refresh || echo "devc-entrypoint: the CA refresh failed; the previous trust store stays in use" >&2
+exec "$@"

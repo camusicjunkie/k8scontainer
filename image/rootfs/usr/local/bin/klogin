@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# klogin: log in to a Supervisor or Guest Cluster with kubectl vsphere login.
+set -euo pipefail
+
+usage() {
+    cat <<'EOF'
+usage: klogin [-h] [namespace] [cluster]
+
+  klogin                     KLOGIN_NAMESPACE / KLOGIN_CLUSTER from personal.env,
+                             or the Supervisor only if neither is set
+  klogin <namespace>         the Supervisor, with that vSphere Namespace's context
+  klogin <namespace> <cluster>
+                             that Guest Cluster
+
+The Supervisor is KLOGIN_SERVER (personal.env) or the single entry in Site
+Config's KLOGIN_SERVERS. The vCenter user and password come from the Secrets
+File. TLS verification is skipped only when Site Config sets KLOGIN_INSECURE=1.
+Tab completion offers Site Config's KLOGIN_NAMESPACES and KLOGIN_CLUSTERS.
+EOF
+}
+
+die() { echo "klogin: $*" >&2; exit 1; }
+
+# The login itself, run under with-secrets so VSPHERE_USER/VSPHERE_PASSWORD
+# exist only in this process. The password goes to kubectl in its environment.
+# Arguments: --server SERVER [other kubectl vsphere login flags].
+if [[ ${1:-} == --with-secrets ]]; then
+    export KUBECTL_VSPHERE_PASSWORD=$VSPHERE_PASSWORD
+    unset VSPHERE_PASSWORD
+    exec kubectl vsphere login "$2" "$3" --vsphere-username "$VSPHERE_USER" "${@:4}"
+fi
+
+case ${1:-} in
+    -h | --help) usage; exit 0 ;;
+    -*) usage >&2; exit 2 ;;
+esac
+(($# <= 2)) || { usage >&2; exit 2; }
+
+if (($#)); then
+    namespace=$1
+    cluster=${2:-}
+else
+    namespace=${KLOGIN_NAMESPACE:-}
+    cluster=${KLOGIN_CLUSTER:-}
+    [[ -z $cluster || -n $namespace ]] ||
+        die "KLOGIN_CLUSTER is set but KLOGIN_NAMESPACE isn't; a Guest Cluster needs its vSphere Namespace"
+fi
+
+server=${KLOGIN_SERVER:-}
+if [[ -z $server ]]; then
+    servers_list=${KLOGIN_SERVERS:-}
+    read -ra servers <<<"${servers_list//,/ }"
+    case ${#servers[@]} in
+        0) die "no Supervisor configured: Site Config's KLOGIN_SERVERS is empty and KLOGIN_SERVER isn't set" ;;
+        1) server=${servers[0]} ;;
+        *)
+            echo "klogin: Site Config lists several Supervisors:" >&2
+            printf '  %s\n' "${servers[@]}" >&2
+            die "choose one with KLOGIN_SERVER in personal.env, or for one call: KLOGIN_SERVER=<server> klogin ..."
+            ;;
+    esac
+fi
+
+args=(--server "$server")
+if [[ -n $cluster ]]; then
+    args+=(--tanzu-kubernetes-cluster-namespace "$namespace" --tanzu-kubernetes-cluster-name "$cluster")
+fi
+[[ ${KLOGIN_INSECURE:-} == 1 ]] && args+=(--insecure-skip-tls-verify)
+
+with-secrets -k VSPHERE_USER -k VSPHERE_PASSWORD "$0" --with-secrets "${args[@]}"
+if [[ -n $namespace && -z $cluster ]]; then
+    kubectl config use-context "$namespace"
+fi

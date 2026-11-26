@@ -1,0 +1,223 @@
+# Generates everything per admin from the Roster (roster.yaml). Templating is
+# the Flux Operator's Go template with << >> delimiters.
+#
+# The Roster is ONE input set holding the whole admin list, not one input set
+# per admin, because the shared Gateway (one IP, ADR 0001) needs a listener per
+# admin inside a single object, and a template only sees one input set at a
+# time. So the template ranges over inputs.admins and renders one Gateway with
+# every listener, then each admin's own objects. Everything generated is in the
+# ResourceSet's inventory, so removing a Roster entry prunes that admin's
+# StatefulSet (and so Pod), key list, Services, listener and route. The
+# StatefulSet's PVC is created by the StatefulSet controller, not by Flux, so
+# it is retained on removal on purpose (see the ticket's Answer).
+#
+# Names: every object is devc-<name>[-suffix]; the Pod and the Services select
+# on the devcontainer/admin=<name> label, so one admin's Service and route can
+# only ever reach that admin's Pod.
+apiVersion: fluxcd.controlplane.io/v1
+kind: ResourceSet
+metadata:
+  name: devcontainer
+  namespace: devcontainer
+spec:
+  inputsFrom:
+    - kind: ResourceSetInputProvider
+      name: roster
+  resourcesTemplate: |
+    <<- if inputs.admins >>
+    ---
+    # Shared Gateway: one IP, one TCP listener per admin. gatewayClassName
+    # istio: the Management Cluster's Istio provisions the LoadBalancer. Not
+    # rendered for an empty Roster: a Gateway needs at least one listener, and
+    # an invalid object would stop the ResourceSet pruning the last admin.
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: Gateway
+    metadata:
+      name: devcontainer
+      namespace: devcontainer
+    spec:
+      gatewayClassName: istio
+      # The Roster's gatewayAddress, unless it is `none`, pins the LoadBalancer
+      # IP, so the address in every Workstation's SSH config survives the
+      # Gateway being recreated. Otherwise the load balancer picks one.
+      <<- $addr := get inputs "gatewayAddress" >>
+      <<- if and $addr (ne $addr "none") >>
+      addresses:
+        - type: IPAddress
+          value: << $addr >>
+      <<- end >>
+      # Istio merges this ConfigMap into the gateway Deployment it generates
+      # (gateway-options.yaml), so the gateway Pod passes Pod Security.
+      infrastructure:
+        parametersRef:
+          group: ""
+          kind: ConfigMap
+          name: devcontainer-gateway
+      listeners:
+    <<- range $a := inputs.admins >>
+        - name: ssh-<< $a.name >>
+          protocol: TCP
+          port: << $a.port | int >>
+          allowedRoutes:
+            kinds:
+              - kind: TCPRoute
+            namespaces:
+              from: Same
+    <<- end >>
+    <<- end >>
+    <<- range $a := inputs.admins >>
+    ---
+    # Key list: this admin's smartcard public key only.
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: devc-<< $a.name >>-authorized-keys
+      namespace: devcontainer
+      labels:
+        devcontainer/admin: << $a.name >>
+    data:
+      authorized_keys: |
+        << $a.publicKey | trim >>
+    ---
+    # Headless Service the StatefulSet requires (serviceName).
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: devc-<< $a.name >>
+      namespace: devcontainer
+    spec:
+      clusterIP: None
+      selector:
+        app.kubernetes.io/name: devcontainer
+        devcontainer/admin: << $a.name >>
+      ports:
+        - name: ssh
+          port: 2222
+          targetPort: ssh
+    ---
+    # What this admin's TCPRoute targets: a ClusterIP Service in front of the Pod.
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: devc-<< $a.name >>-ssh
+      namespace: devcontainer
+    spec:
+      selector:
+        app.kubernetes.io/name: devcontainer
+        devcontainer/admin: << $a.name >>
+      ports:
+        - name: ssh
+          port: 2222
+          targetPort: ssh
+    ---
+    # TCPRoute is GA (v1, standard channel) since Gateway API v1.6.0.
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: TCPRoute
+    metadata:
+      name: devc-<< $a.name >>-ssh
+      namespace: devcontainer
+    spec:
+      parentRefs:
+        - name: devcontainer
+          sectionName: ssh-<< $a.name >>
+      rules:
+        - backendRefs:
+            - name: devc-<< $a.name >>-ssh
+              port: 2222
+    ---
+    # One admin's Devcontainer Pod. The image is the Standard Image: non-root
+    # user dev (1000), sshd on 2222. The State Directory is one volume mounted
+    # only at the six paths below; the rest of the home directory comes from
+    # the image.
+    apiVersion: apps/v1
+    kind: StatefulSet
+    metadata:
+      name: devc-<< $a.name >>
+      namespace: devcontainer
+      labels:
+        devcontainer/admin: << $a.name >>
+    spec:
+      replicas: 1
+      serviceName: devc-<< $a.name >>
+      updateStrategy:
+        type: OnDelete
+      selector:
+        matchLabels:
+          app.kubernetes.io/name: devcontainer
+          devcontainer/admin: << $a.name >>
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: devcontainer
+            devcontainer/admin: << $a.name >>
+        spec:
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: devcontainer
+              # One image for every admin, set in the Roster: the site's
+              # Registry repository and the tag the image automation rewrites.
+              # OnDelete means a new tag reaches a Pod only when its admin
+              # restarts it.
+              image: << inputs.imageRepository >>:<< inputs.imageTag >>
+              imagePullPolicy: IfNotPresent
+              ports:
+                - name: ssh
+                  containerPort: 2222
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              # Defaults, each overridable per admin in the Roster.
+              resources:
+                requests:
+                  cpu: << dig "resources" "requests" "cpu" "250m" $a | quote >>
+                  memory: << dig "resources" "requests" "memory" "512Mi" $a | quote >>
+                limits:
+                  cpu: << dig "resources" "limits" "cpu" "2" $a | quote >>
+                  memory: << dig "resources" "limits" "memory" "4Gi" $a | quote >>
+              # Ready once sshd listens on 2222 (devc-ready reads devc-sshd's
+              # pid file). Not tcpSocket, which sshd logs as a pre-auth
+              # disconnect on every probe.
+              readinessProbe:
+                exec:
+                  command: ["devc-ready", "2222"]
+                periodSeconds: 10
+              volumeMounts:
+                - { name: state, mountPath: /home/dev/workspace, subPath: workspace }
+                - { name: state, mountPath: /home/dev/.kube, subPath: .kube }
+                - { name: state, mountPath: /home/dev/.secrets, subPath: .secrets }
+                - { name: state, mountPath: /home/dev/.devc/personal, subPath: .devc/personal }
+                - { name: state, mountPath: /var/lib/devc/hostkeys, subPath: hostkeys }
+                - { name: state, mountPath: /home/dev/.local, subPath: .local }
+                - { name: authorized-keys, mountPath: /etc/devc/authorized_keys, subPath: authorized_keys, readOnly: true }
+                # Single-file (subPath) mounts: the image's CA refresh rejects
+                # symlinks, which a whole ConfigMap directory is made of.
+                - { name: site-config, mountPath: /etc/devcontainer/site/site.env, subPath: site.env, readOnly: true }
+                - { name: site-config, mountPath: /etc/devcontainer/site/ca/site-ca.crt, subPath: site-ca.crt, readOnly: true }
+          volumes:
+            - name: authorized-keys
+              configMap:
+                name: devc-<< $a.name >>-authorized-keys
+            - name: site-config
+              configMap:
+                name: site-config
+      volumeClaimTemplates:
+        - metadata:
+            name: state
+          spec:
+            accessModes: ["ReadWriteOnce"]
+            # The Roster's storageClass, or none: the cluster's default class.
+            <<- with get inputs "storageClass" >>
+            storageClassName: << . >>
+            <<- end >>
+            resources:
+              requests:
+                storage: 20Gi
+    <<- end >>

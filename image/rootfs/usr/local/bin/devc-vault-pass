@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# devc-vault-pass: ansible-vault's password script for the Secrets File.
+# Prints the SHA-256 of the forwarded agent's signature over a fixed challenge,
+# made with the key DEVC_UNLOCK_KEY names. The password exists only in this
+# pipe: it is never stored. Use it as --vault-password-file (or
+# ANSIBLE_VAULT_PASSWORD_FILE) for playbooks that read the Secrets File.
+set -euo pipefail
+
+# shellcheck source=../lib/devc/secrets.bash
+source "$(dirname "$(readlink -f "$0")")/../lib/devc/secrets.bash"
+
+require_agent
+pub=$(mktemp)
+trap 'rm -f "$pub"' EXIT
+unlock_pubkey "$pub" >/dev/null
+signature=$(unlock_signature "$pub") || die "the agent didn't sign with $DEVC_UNLOCK_KEY"
+[[ -n $signature ]] || die "the agent returned an empty signature"
+sha256sum <<<"$signature" | cut -d' ' -f1

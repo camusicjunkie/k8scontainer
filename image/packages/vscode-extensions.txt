@@ -1,0 +1,13 @@
+# Extensions baked into the image, as publisher.name@version, one per line.
+# Installed with the server pinned in vscode.env; dependencies are resolved at
+# build time and recorded in the Release MANIFEST.
+editorconfig.editorconfig@0.18.2
+exiasr.hadolint@1.2.0
+gitlab.gitlab-workflow@7.1.0
+hashicorp.hcl@0.6.0
+hashicorp.terraform@2.40.0
+ms-kubernetes-tools.vscode-kubernetes-tools@1.4.1
+ms-vscode.powershell@2025.4.0
+redhat.ansible@26.8.2
+redhat.vscode-yaml@1.24.0
+timonwong.shellcheck@0.46.4

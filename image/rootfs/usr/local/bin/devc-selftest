@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# devc-selftest: checks that the Standard Image works with no network.
+# Runs every drop-in in DEVC_SELFTEST_DIR; each one calls `check NAME CMD [ARGS]`.
+# Exits non-zero, naming each failure, if any check fails.
+set -uo pipefail
+
+dir=${DEVC_SELFTEST_DIR:-/usr/local/lib/devc/selftest.d}
+release=${DEVC_RELEASE_FILE:-/etc/devcontainer/release}
+
+total=0
+failed=()
+
+# check NAME CMD [ARGS...]: runs CMD and reports ok or FAIL with its output.
+check() {
+    local name=$1 out
+    shift
+    total=$((total + 1))
+    if out=$("$@" 2>&1 </dev/null); then
+        printf 'ok   %s\n' "$name"
+    else
+        printf 'FAIL %s\n' "$name"
+        [[ -n $out ]] && tail -n 20 <<<"$out" | sed 's/^/     /'
+        failed+=("$name")
+    fi
+}
+
+# manifest_value KEY: a header field ("key: value") of the release MANIFEST.
+manifest_value() {
+    sed -n "s/^$1: //p" "$release" | head -n1
+}
+
+# manifest_section NAME: the lines of a "## NAME" section of the release MANIFEST.
+manifest_section() {
+    awk -v s="## $1" '$0 == s { on = 1; next } /^## / { on = 0 } on && NF' "$release"
+}
+
+for f in "$dir"/*.sh; do
+    [[ -e $f ]] || continue
+    # shellcheck source=/dev/null
+    source "$f"
+done
+
+if ((${#failed[@]})); then
+    list=$(printf '%s, ' "${failed[@]}")
+    printf '%d of %d checks failed: %s\n' "${#failed[@]}" "$total" "${list%, }"
+    exit 1
+fi
+printf 'all %d checks passed\n' "$total"

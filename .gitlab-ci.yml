@@ -1,0 +1,108 @@
+# Builds the Standard Image on the Connected Side, gates it on its self-test and
+# publishes it to the Connected Harbor when the Release Owner tags a Release.
+#
+# No privileged runner and no Docker daemon: buildah builds rootless (vfs
+# storage, chroot isolation) and skopeo copies the tested image between
+# registries. The Dockerfile uses RUN --mount=type=bind, which kaniko lacks.
+#
+# Runner needs (checked locally with Docker, not on the real runner): the build
+# container must be allowed user namespaces (seccomp not blocking unshare) and
+# a /dev/fuse device, because buildah overlays the build context for RUN
+# --mount=type=bind. It does not need --privileged or access to a daemon.
+#
+# Every ref builds and self-tests. The self-test runs the candidate with no
+# network (buildah run --network none), as tests/image.sh does locally, so it
+# proves the image works offline. It needs rootless isolation: under chroot
+# isolation buildah leaves the job's network in place (checked locally: TCP
+# still connects). Only a Release tag (vX.Y.Z or X.Y.Z)
+# publishes, and only the exact image that passed. Untested images never reach
+# Harbor, and an untagged push never publishes.
+#
+# Settings (Settings > CI/CD > Variables):
+#   HARBOR_IMAGE     e.g. harbor.example/devcontainer/standard (no tag)
+#   HARBOR_USER      Harbor robot account with push on that project
+#   HARBOR_PASSWORD  masked and protected
+#   DHI_USER         Docker account entitled to the DHI base on dhi.io
+#   DHI_PASSWORD     its access token, masked; if both are unset the build
+#                    pulls the base anonymously
+#   SUPERVISOR_HOST  optional: a Supervisor the runner can reach; the build
+#                    bakes its kubectl-vsphere (see image/Dockerfile)
+#   VSPHERE_PLUGIN_SHA256  that Supervisor's vsphere-plugin.zip SHA-256,
+#                    required with SUPERVISOR_HOST
+# Protect the Release tag pattern so only the Release Owner can create it. The
+# project's Container Registry holds a `candidate` image per pipeline: tagged
+# <commit>-<pipeline id>, so a branch pipeline and a tag pipeline on the same
+# commit (merge, then tag) never overwrite each other's candidate, and publish
+# copies the image its own self-test passed. Credentials go in on stdin, never
+# on a command line.
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+stages: [build, test, publish]
+
+variables:
+  CANDIDATE: $CI_REGISTRY_IMAGE/candidate:$CI_COMMIT_SHA-$CI_PIPELINE_ID
+
+# The repo's file checks (tests/all.sh --files): the pipeline's own rules, the
+# contracts between image and manifests, and the docs. No image needed, so it
+# starts at once, and a Release publishes only if it passed too.
+checks:
+  stage: test
+  needs: []
+  image: python:3.12.8-slim-bookworm
+  script:
+    - pip install --quiet pyyaml==6.0.2
+    - bash tests/all.sh --files
+
+build:
+  stage: build
+  image: quay.io/buildah/stable:v1.46.1
+  variables:
+    STORAGE_DRIVER: vfs
+    BUILDAH_ISOLATION: chroot
+  script:
+    - export VERSION="${CI_COMMIT_TAG:-0.0.0-$CI_COMMIT_SHORT_SHA}"
+    - |
+      if [ -n "${DHI_USER:-}" ]; then
+        printf '%s' "$DHI_PASSWORD" | buildah login --username "$DHI_USER" --password-stdin dhi.io
+      fi
+    - >
+      buildah build
+      --build-arg "DEVC_VERSION=$VERSION"
+      --build-arg "DEVC_GIT_SHA=$CI_COMMIT_SHA"
+      --build-arg "SUPERVISOR_HOST=${SUPERVISOR_HOST:-}"
+      --build-arg "VSPHERE_PLUGIN_SHA256=${VSPHERE_PLUGIN_SHA256:-}"
+      --tag "$CANDIDATE" image
+    - printf '%s' "$CI_REGISTRY_PASSWORD" | buildah login --username "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - buildah push "$CANDIDATE" "docker://$CANDIDATE"
+
+selftest:
+  stage: test
+  needs: [build]
+  image: quay.io/buildah/stable:v1.46.1
+  variables:
+    STORAGE_DRIVER: vfs
+    BUILDAH_ISOLATION: rootless
+  script:
+    - printf '%s' "$CI_REGISTRY_PASSWORD" | buildah login --username "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - ctr=$(buildah from "docker://$CANDIDATE")
+    - buildah run --network none "$ctr" -- devc-selftest
+
+publish:
+  stage: publish
+  needs: [selftest, checks]
+  image:
+    name: quay.io/skopeo/stable:v1.25.1
+    entrypoint: [""]
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v?\d+\.\d+\.\d+$/
+  script:
+    - printf '%s' "$CI_REGISTRY_PASSWORD" | skopeo login --username "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - printf '%s' "$HARBOR_PASSWORD" | skopeo login --username "$HARBOR_USER" --password-stdin "${HARBOR_IMAGE%%/*}"
+    - skopeo copy --all "docker://$CANDIDATE" "docker://$HARBOR_IMAGE:$CI_COMMIT_TAG"

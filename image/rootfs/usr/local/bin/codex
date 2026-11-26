@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# codex: runs Codex CLI against this site's AI gateway.
+#
+# Site Config's AI_GATEWAY_URL sets the gateway, and AI_GATEWAY_MODEL (which
+# personal.env can override) the model; an explicit -m/--model wins. Codex
+# runs under with-secrets -k AI_GATEWAY_KEY, so it never sees the rest of the
+# Secrets File. With no AI_GATEWAY_URL it stops: it never falls back to
+# api.openai.com.
+set -euo pipefail
+
+real=${DEVC_CODEX_BIN:-/usr/local/lib/codex/codex}
+
+case ${1:-} in
+    --version | -V | --help | -h) exec "$real" "$@" ;;
+esac
+
+if [[ -z ${AI_GATEWAY_URL:-} ]]; then
+    echo "codex: no AI gateway configured for this site (Site Config's site.env has no AI_GATEWAY_URL)" >&2
+    exit 1
+fi
+
+args=(-c "model_providers.ai-gateway.base_url=\"$AI_GATEWAY_URL\"")
+model_given=
+for a in "$@"; do
+    case $a in -m | --model | --model=*) model_given=1 ;; esac
+done
+if [[ -z $model_given && -n ${AI_GATEWAY_MODEL:-} ]]; then
+    args+=(-c "model=\"$AI_GATEWAY_MODEL\"")
+fi
+
+exec with-secrets -k AI_GATEWAY_KEY "$real" "${args[@]}" "$@"

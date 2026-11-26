@@ -1,0 +1,17 @@
+apiVersion: fluxcd.controlplane.io/v1
+kind: ResourceSetInputProvider
+metadata:
+  name: roster
+  namespace: devcontainer
+spec:
+  type: Static
+  defaultValues:
+    imageRepository: harbor.example/devcontainer/standard
+    imageTag: 0.2.0
+    admins:
+      - name: bob
+        port: 2202
+        publicKey: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCigzpgW7k678QQuOFlGK8naZW6mw0DG4b4FuNnp7lByi1WJbPnshcPhSfrrTsiFrmLOg7kfPGGvVwZC7R9CvqvaKVxHTdR3V2t2+FRQ6kjB6PJGFLIgYHp9a1eEpjgCV6V3L0fnGSgUIiOMq5KLEnUZPgBb1Xr7lppj79W86K6wIPb/Pnx8ZDeV1hGoz9abNK5fLXjrSZN7ALODBAOe8vD1iM5Gvd2NigaCdo1/aU730gV660ibRXmKYHONe9MqlWyRD9VqUv6Bso+SLJsu/kM5Zrk7Vjw1jHPSMSmemdhJyKKs1DHxAOrX4v3yHp8Am3UkYXsIzq9dFcJNS6TN5l9 bob-piv-placeholder
+        resources:
+          requests: { cpu: 500m, memory: 1Gi }
+          limits: { cpu: "4", memory: 8Gi }

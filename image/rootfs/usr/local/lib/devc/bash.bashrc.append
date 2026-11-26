@@ -1,0 +1,6 @@
+
+# Standard Image: drop-ins, ending with Personal Config's bashrc (99-personal.sh).
+for f in /etc/bash.bashrc.d/*.sh; do
+    [ -r "$f" ] && . "$f"
+done
+unset f

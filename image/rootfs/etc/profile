@@ -1,0 +1,22 @@
+# /etc/profile: login shells. The DHI base ships none; this is Debian's, trimmed.
+if [ "$(id -u)" -eq 0 ]; then
+    PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+else
+    PATH="/usr/local/bin:/usr/bin:/bin"
+fi
+# The user-owned tools area (~/.local on the volume): stopgap installs, no root.
+if [ "$(id -u)" -ne 0 ] && [ -d "$HOME/.local/bin" ]; then
+    PATH="$HOME/.local/bin:$PATH"
+fi
+export PATH
+
+if [ "${PS1-}" ] && [ "${BASH-}" ] && [ "$BASH" != "/bin/sh" ] && [ -f /etc/bash.bashrc ]; then
+    . /etc/bash.bashrc
+fi
+
+if [ -d /etc/profile.d ]; then
+    for i in /etc/profile.d/*.sh; do
+        [ -r "$i" ] && . "$i"
+    done
+    unset i
+fi

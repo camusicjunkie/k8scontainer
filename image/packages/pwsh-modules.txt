@@ -1,0 +1,5 @@
+# PowerShell modules installed for all users, one "Name ~> MAJOR" per line. The
+# build takes the newest version inside each major; MANIFEST records it.
+VCF.PowerCLI ~> 9
+VMware.vSphere.SsoAdmin ~> 1
+Pester ~> 6

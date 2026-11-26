@@ -1,0 +1,11 @@
+apiVersion: fluxcd.controlplane.io/v1
+kind: ResourceSetInputProvider
+metadata:
+  name: roster
+  namespace: devcontainer
+spec:
+  type: Static
+  defaultValues:
+    imageRepository: harbor.example/devcontainer/standard
+    imageTag: 0.2.0
+    admins: []

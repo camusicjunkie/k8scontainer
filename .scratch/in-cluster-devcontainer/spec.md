@@ -27,7 +27,7 @@ Each admin gets their own long-lived Devcontainer Pod in the Devcontainer Namesp
 13. As an admin, I want my site's certificate authorities trusted automatically, so that internal TLS works without manual steps.
 14. As an admin, I want to raise my own CPU or memory limit through the Roster, so that a heavy task is not throttled.
 15. As an admin, I want a clear message when my agent is not forwarded, so that I know why my secrets will not unlock.
-16. As a teammate who is not a cluster admin, I want to use my devcontainer with no access to the Kubernetes API, so that the team need not widen cluster access for tooling.
+16. As a teammate who is not a cluster admin, I want to use my devcontainer with no access to the Kubernetes API, so that the team need not widen cluster access for tooling. The Pod runs with no ServiceAccount token, so its own identity grants nothing; the network does not block the API, and an admin who brings their own credentials can reach any cluster, the Management Cluster included.
 17. As a Release Owner, I want to decide when a Release is cut, so that admins only receive reviewed changes.
 18. As a Release Owner, I want a Release to be an image archive plus a checksum, so that it crosses the air gap as a small, verifiable set of files.
 19. As a Release Owner, I want a Review Packet generated with each Release, so that the transfer process has the evidence it needs.
@@ -38,7 +38,7 @@ Each admin gets their own long-lived Devcontainer Pod in the Devcontainer Namesp
 24. As a platform maintainer, I want to remove an admin by removing their Roster entry, so that their access ends with the merge.
 25. As a platform maintainer, I want each admin's Pod, volume, key list and port generated from the Roster, so that no per-admin manifest is hand-written.
 26. As a platform maintainer, I want the Devcontainer Namespace to enforce Pod Security `restricted`, so that no Pod can gain privileges.
-27. As a platform maintainer, I want the Pods to work with the existing Kyverno policies and the Istio ambient label, so that they follow platform rules.
+27. As a platform maintainer, I want the Pods to pass the Management Cluster's admission setup (Pod Security `restricted`; the Management Cluster runs no Kyverno, and Istio there runs only the shared Gateway, with no mesh), so that they follow platform rules.
 28. As a platform maintainer, I want Site Config rendered per network from the existing runtime facts, so that no organization-specific value is committed to Git.
 29. As a platform maintainer, I want one Gateway IP with a port per admin, so that I do not need an IP address for every admin.
 30. As a platform maintainer, I want each Pod's `sshd` host key kept on the admin's volume, so that Remote-SSH does not warn about a changed host key after a restart.
@@ -56,7 +56,7 @@ Each admin gets their own long-lived Devcontainer Pod in the Devcontainer Namesp
 - **`sshd`:** accepts only the public keys mounted from the Roster, as the image's one user. It allows agent forwarding and TCP forwarding (Remote-SSH needs both), disables passwords, and reads its host key from a path on the admin's volume. The host key is created once, on first start.
 - **Volume layout:** one volume per admin, default 20Gi on the `standard` StorageClass, mounted only at specific paths: workspace, cluster logins, Secrets File, Personal Config, host keys and a user-owned tools area. The rest of the home directory comes from the image, so every Release refreshes the baked-in server, extensions and dotfiles.
 - **Pod shape:** a StatefulSet of one replica per admin with the `OnDelete` update strategy. Requests are modest (about 250m CPU, 512Mi memory) and limits generous (about 2 CPU, 4Gi), overridable per admin in the Roster.
-- **Namespace:** one Devcontainer Namespace on the Management Cluster enforcing Pod Security `restricted`. Pods run non-root, with all capabilities dropped, no privilege escalation and the default seccomp profile, compatible with the existing Kyverno policies and Istio ambient labelling.
+- **Namespace:** one Devcontainer Namespace on the Management Cluster enforcing Pod Security `restricted`. Pods run non-root, with all capabilities dropped, no privilege escalation and the default seccomp profile. The Management Cluster runs no Kyverno and no Istio mesh, so Pod Security admission is the whole admission setup.
 - **Exposure:** one shared Gateway IP on the Management Cluster with one TCP listener port per admin, taken from the Roster. This assumes a small team (roughly 20 admins or fewer).
 - **Roster:** a list in Git with, per admin, a name, a smartcard PIV Authentication public key, a port and optional resource overrides. A Flux `ResourceSet` generates each admin's StatefulSet, volume, key list, Service and Gateway route.
 - **Site Config:** a read-only ConfigMap per network, rendered by Flux from the network's runtime facts (for example certificate authorities and the Supervisor addresses used by `klogin`). Personal Config, Secrets File, cluster logins and workspace live on the admin's volume.
@@ -70,7 +70,7 @@ Each admin gets their own long-lived Devcontainer Pod in the Devcontainer Namesp
 
 - A good test checks external behaviour only: what an admin or operator can observe from outside the image or cluster, never how a script or manifest is written.
 - **Image seam:** the Standard Image's self-test run against the built image with no network, as a non-root user. It covers the baked-in tools, trust store handling, the VS Code server and extensions, `sshd` behaviour (key-only login, agent and TCP forwarding enabled), the user-owned tools area, and the absence of any need for root. Prior art: the self-test scripts in the old devcontainer repository.
-- **Cluster seam:** the manifests rendered for a sample Roster are validated against the Kubernetes and Flux schemas and the repository's Kyverno policies, and checked for Pod Security `restricted` compliance. Prior art: the Gitops repository's validation scripts.
+- **Cluster seam:** the manifests rendered for a sample Roster are validated against the Kubernetes and Flux schemas, and checked for Pod Security `restricted` compliance, which is the Management Cluster's whole admission setup (it runs no Kyverno). Prior art: the Gitops repository's validation scripts.
 - **End-to-end checklist:** a manual gate run on the Disconnected Side. An admin Remote-SSHes through the Gateway with the smartcard, unlocks their Secrets File, runs `klogin` to a Guest Cluster, restarts their Pod and finds their state intact. Prior art: the old repository's e2e checklist.
 - No separate unit tests for individual scripts beyond what the two seams already exercise.
 

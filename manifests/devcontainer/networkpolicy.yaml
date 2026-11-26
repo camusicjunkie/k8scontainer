@@ -1,0 +1,49 @@
+# Isolates every Devcontainer Pod (app.kubernetes.io/name: devcontainer):
+# - Ingress only from the shared Gateway's Pod, on sshd's port. One admin's Pod
+#   cannot reach another's sshd, and nothing else in the cluster can either.
+# - Egress to cluster DNS, and to anywhere outside the cluster's Pod network
+#   (Supervisors, vCenter, GitLab, Harbor, the hosts admins manage), but never
+#   to other Pods. sshd allows TCP forwarding (Remote-SSH needs it), so without
+#   this an admin's session would be a way into the Management Cluster's own
+#   workloads. It isolates Pods only: the nodes, the kubelet and the API
+#   server's addresses are outside the Pod network and stay reachable. The Pod
+#   mounts no ServiceAccount token, so the API grants it nothing; an admin who
+#   brings their own credentials can use any cluster, this one included.
+# The Pod CIDR is the one per-network value, from the network's runtime facts
+# (DEVCONTAINER_POD_CIDR); without it, VKS's default 192.168.0.0/16. Kubelet probes come from
+# the node, not a Pod, and the readiness probe is an exec anyway.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: devcontainer-pods
+  namespace: devcontainer
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: devcontainer
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        # The gateway Deployment Istio generates for Gateway `devcontainer`.
+        - podSelector:
+            matchLabels:
+              gateway.networking.k8s.io/gateway-name: devcontainer
+      ports:
+        - port: 2222
+          protocol: TCP
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - { port: 53, protocol: UDP }
+        - { port: 53, protocol: TCP }
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - ${DEVCONTAINER_POD_CIDR:=192.168.0.0/16}
