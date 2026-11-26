@@ -32,19 +32,39 @@ if ! command -v flux-operator >/dev/null; then
     bad "flux-operator CLI is on PATH (renders the ResourceSet; see https://fluxoperator.dev/docs/cli/)"; exit 1
 fi
 
-# render ROSTER OUT: the Namespace and Site Config (kustomize; the Roster and
-# ResourceSet objects are what the cluster applies, so they are dropped from
-# the output) followed by what the ResourceSet generates from that Roster,
-# evaluated by the real flux-operator templating engine.
+# subst: the runtime facts substituted as Flux's postBuild does (strict), with
+# the test values in tests/site.
+subst() { "$py" -I "$(native "$repo/tests/site/subst.py")"; }
+
+# render ROSTER OUT: the Namespace (tests/kind/namespace.yaml, as the Gitops
+# repository owns it) and the directory's objects (kustomize, then the runtime
+# facts; the Roster and ResourceSet objects are what the cluster applies, so
+# they are dropped from the output) followed by what the ResourceSet generates
+# from that Roster, evaluated by the real flux-operator templating engine.
+# The committed Roster is taken from that build, after substitution, because
+# that is what Flux applies: kustomize drops quotes, so a value that
+# substitutes to empty would reach the ResourceSet as null. The sample Rosters
+# in tests/rosters are substituted as they are.
 render() {
-    kubectl kustomize "$(native "$repo/manifests/devcontainer")" 2>"$work/err" | "$py" -I -c '
+    local roster=$work/roster-$(basename "$1") built=$work/built.yaml
+    { cat "$repo/tests/kind/namespace.yaml"; echo ---
+      kubectl kustomize "$(native "$repo/manifests/devcontainer")" 2>"$work/err"; } | subst >"$built" || return 1
+    if [[ $1 -ef $repo/manifests/devcontainer/roster.yaml ]]; then
+        "$py" -I -c '
+import sys, yaml
+r = [d for d in yaml.safe_load_all(open(sys.argv[1])) if d and d["kind"] == "ResourceSetInputProvider"]
+yaml.safe_dump(r[0], sys.stdout)' "$(native "$built")" >"$roster" || return 1
+    else
+        subst <"$1" >"$roster" || return 1
+    fi
+    "$py" -I -c '
 import sys, yaml
 docs = [d for d in yaml.safe_load_all(sys.stdin) if d and d["kind"] not in ("ResourceSet", "ResourceSetInputProvider")]
-sys.stdout.write(yaml.safe_dump_all(docs))' >"$2" || { cat "$work/err"; return 1; }
+sys.stdout.write(yaml.safe_dump_all(docs))' <"$built" >"$2" || { cat "$work/err"; return 1; }
     echo --- >>"$2"
     # The CLI fails on an empty result; for an empty Roster that is the answer.
     flux-operator build resourceset -f "$(native "$repo/manifests/devcontainer/resourceset.yaml")" \
-        --inputs-from-provider "$(native "$1")" >>"$2" 2>"$work/err" \
+        --inputs-from-provider "$(native "$roster")" >>"$2" 2>"$work/err" \
         || grep -q 'no objects were generated' "$work/err" || { cat "$work/err"; return 1; }
 }
 
@@ -67,7 +87,7 @@ for roster in "$repo/tests/rosters/one.yaml" "$repo/tests/rosters/two.yaml" \
     else
         bad "$label: kubeconform"
     fi
-    "$py" -I "$(native "$repo/tests/cluster_policy.py")" "$(native "$roster")" <"$out" || failed=1
+    "$py" -I "$(native "$repo/tests/cluster_policy.py")" "$(native "$work/roster-$(basename "$roster")")" <"$out" || failed=1
 done
 
 # Removing an entry removes that admin's Pod, route and everything else named for them.
@@ -78,7 +98,9 @@ else ok "removing alice from the Roster drops every object and listener generate
 # Image update flow: the marker and policy, and that a new tag (or a pinned
 # earlier one) changes only the Pod template image.
 if render "$repo/tests/rosters/one-older-tag.yaml" "$work/one-older-tag.yaml"; then
-    "$py" -I "$(native "$repo/tests/cluster_update.py")" "$(native "$repo/manifests/devcontainer/roster.yaml")" \
+    # The marker is a comment, so the update check reads the Roster's text.
+    subst <"$repo/manifests/devcontainer/roster.yaml" >"$work/roster-text.yaml"
+    "$py" -I "$(native "$repo/tests/cluster_update.py")" "$(native "$work/roster-text.yaml")" \
         "$(native "$work/one-older-tag.yaml")" "$(native "$work/one.yaml")" || failed=1
 else bad "one-older-tag.yaml renders"; fi
 rendered=$work/one.yaml
@@ -91,12 +113,14 @@ fi
 # come from the rendered ConfigMap.
 mkdir "$work/site"
 "$py" -I - "$(native "$rendered")" "$(native "$work/site")" <<'PY'
-import sys, pathlib, yaml
+import base64, sys, pathlib, yaml
 out = pathlib.Path(sys.argv[2])
 for d in yaml.safe_load_all(open(sys.argv[1])):
     if d and d["kind"] == "ConfigMap" and "site" in d["metadata"]["name"]:
-        for k, v in d["data"].items():
+        for k, v in d.get("data", {}).items():
             (out / k).write_text(v, newline="")
+        for k, v in d.get("binaryData", {}).items():
+            (out / k).write_bytes(base64.b64decode(v))
 PY
 docker volume create "$vol" >/dev/null
 paths=(workspace:/home/dev/workspace .kube:/home/dev/.kube .secrets:/home/dev/.secrets

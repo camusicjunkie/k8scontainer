@@ -53,4 +53,7 @@ check "sshd refuses every other user" sshd_other_user_refused
 check "sshd offers no password login" sshd_password_refused
 check "sshd forwards the client's agent" sshd_agent_forwarded
 check "sshd forwards TCP connections" sshd_tcp_forwarded
+check "devc-ready reports sshd ready on its port (the readiness probe runs it)" devc-ready "$ssh_port"
+sshd_other_port_not_ready() { ! devc-ready $((ssh_port + 1)); }
+check "devc-ready reports a port no sshd listens on as not ready" sshd_other_port_not_ready
 check "sshd created its host key at the mounted path" test -s "$ssh_tmp/hostkeys/ssh_host_ed25519_key"

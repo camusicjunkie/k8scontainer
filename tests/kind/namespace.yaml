@@ -1,0 +1,11 @@
+# The Devcontainer Namespace as the Management Cluster has it. The Gitops
+# repository owns the real one (clusters/management/devcontainer.yaml, prune
+# disabled so admins' volumes outlive the sync); tests/kind/up.sh applies this
+# one on kind, and tests/cluster.sh renders it in front of the manifests.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: devcontainer
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest

@@ -55,10 +55,16 @@ grep -q 'DHI_BASE' image/Dockerfile || bad "DHI_BASE not in image/Dockerfile"
 grep -q 'HARBOR_IMAGE' .gitlab-ci.yml && grep -q 'HARBOR_USER' .gitlab-ci.yml && grep -q 'HARBOR_PASSWORD' .gitlab-ci.yml || bad "CI variable names differ from .gitlab-ci.yml"
 grep -q 'OnDelete' manifests/devcontainer/resourceset.yaml || bad "OnDelete not in resourceset"
 grep -q '">=0.1.0"' manifests/devcontainer/image-automation.yaml || bad "ImagePolicy range differs from docs"
-grep -q 'imagepolicy": "devcontainer:devcontainer-standard' manifests/devcontainer/roster.yaml || bad "marker differs from docs"
+grep -q 'imagepolicy": "devcontainer:devcontainer-standard:tag' manifests/devcontainer/roster.yaml || bad "marker differs from docs"
 grep -q 'ms-vscode-remote.remote-ssh' workstation/install.ps1 || bad "Remote-SSH id differs"
 grep -q 'state-devc\|name: state' manifests/devcontainer/resourceset.yaml || bad "volume claim name differs"
 grep -q 'DEVC_UNLOCK_KEY' image/rootfs/usr/local/lib/devc/secrets.bash || bad "DEVC_UNLOCK_KEY missing"
+# The runtime-facts contract: the README names every variable in tests/site/facts.env.
+py=python3; python3 -c "" >/dev/null 2>&1 || py=python
+names=$("$py" -I tests/site/subst.py --names | tr -d '\r') || bad "tests/site/subst.py --names failed"
+for name in $names; do
+    grep -q "\`$name\`" README.md || bad "README doesn't name runtime fact $name (tests/site/facts.env)"
+done
 # Personal Config: the bashrc the image sources is on the path the Pod mounts.
 grep -q 'mountPath: /home/dev/.devc/personal' manifests/devcontainer/resourceset.yaml || bad "Pod does not mount Personal Config at ~/.devc/personal"
 grep -q '\$HOME/.devc/personal/bashrc' image/rootfs/etc/bash.bashrc.d/99-personal.sh || bad "99-personal.sh does not read ~/.devc/personal/bashrc"

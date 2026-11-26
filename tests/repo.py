@@ -12,6 +12,7 @@ Reads files only, so it needs no Docker, cluster or network. Checks:
   4. no resolved ticket has an acceptance item left open without `[unverified]`.
 """
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -105,6 +106,20 @@ for p in files("image/**/*", "manifests/**/*", "tests/**/*", "release/**/*", "wo
             for t in term.findall(body):
                 hits.append(f"{p.relative_to(ROOT).as_posix()}:{n} '{t}'")
 check(f"no GLOSSARY _Avoid_ term in code comments ({', '.join(avoid)})", not hits, "; ".join(hits))
+
+# 3b. Runtime facts: the Flux variables the manifests use are exactly the
+# contract in tests/site/facts.env, which the Gitops repository's bootstrap
+# writes into flux-runtime-info. With strict substitution, a variable missing
+# there fails the sync; one listed but unused is a stale contract.
+contract = set(subprocess.run([sys.executable, "-I", str(ROOT / "tests/site/subst.py"), "--names"],
+                              capture_output=True, text=True, check=True).stdout.split())
+used = set()
+for p in files("manifests/**/*.yaml"):
+    used |= set(re.findall(r"\$\{([A-Za-z_][A-Za-z0-9_]*)", text(p)))
+check("every Flux variable in manifests/ is a runtime fact in tests/site/facts.env", used <= contract,
+      ", ".join(sorted(used - contract)))
+check("every runtime fact in tests/site/facts.env is used in manifests/", contract <= used,
+      ", ".join(sorted(contract - used)))
 
 # 4. Ticket hygiene.
 open_items = []

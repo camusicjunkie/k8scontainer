@@ -6,8 +6,10 @@ metadata:
 spec:
   type: Static
   defaultValues:
-    image: harbor.example/devcontainer/standard:0.2.0
+    imageRepository: harbor.example/devcontainer/standard
+    imageTag: 0.2.0
     storageClass: fast
+    gatewayAddress: 10.0.0.50
     admins:
       - name: alice
         port: 2201

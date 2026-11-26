@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Cluster seam, policy half: reads the rendered manifests (YAML on stdin) and
-checks what the Management Cluster would enforce on them. Stands in for the
-Gitops repository's Kyverno policies, which are not available here: it asserts
-the Pod Security `restricted` fields (Kubernetes 1.31 profile) and the
-tickets' behaviours.
+checks what the Management Cluster would enforce on them. The Management
+Cluster runs no Kyverno, so that is Pod Security admission: it asserts the Pod
+Security `restricted` fields (Kubernetes 1.31 profile) and the tickets'
+behaviours.
 
 The input is the Namespace and Site Config (`kubectl kustomize
 manifests/devcontainer`) followed by what the ResourceSet generates for a
@@ -12,7 +12,10 @@ there, and everything per admin is checked for every admin in it:
 
     python3 tests/cluster_policy.py ROSTER.yaml <rendered.yaml
 """
+import base64
+import re
 import sys
+from pathlib import Path
 
 import yaml
 
@@ -21,6 +24,15 @@ roster = inputs["admins"]
 storage_class = inputs.get("storageClass")  # absent: the claim names no class
 docs = [d for d in yaml.safe_load_all(sys.stdin) if d]
 failed = []
+
+# The Roster keys the ResourceSet template reads: `inputs.x` and `$a.x` must be
+# there, `get inputs "x"` and `dig "x"` may be. A key outside these (a Roster
+# kept from another network in an older format, say) would be silently ignored.
+template = (Path(__file__).resolve().parent.parent / "manifests/devcontainer/resourceset.yaml").read_text()
+TOP_REQUIRED = set(re.findall(r"\binputs\.(\w+)", template))
+TOP_OPTIONAL = set(re.findall(r'\bget inputs "(\w+)"', template))
+ADMIN_REQUIRED = set(re.findall(r"\$a\.(\w+)", template))
+ADMIN_OPTIONAL = set(re.findall(r'\bdig "(\w+)"', template))
 
 DEFAULT_RESOURCES = {"requests": {"cpu": "250m", "memory": "512Mi"}, "limits": {"cpu": "2", "memory": "4Gi"}}
 WANT_PATHS = {"workspace": "/home/dev/workspace", ".kube": "/home/dev/.kube", ".secrets": "/home/dev/.secrets",
@@ -38,6 +50,13 @@ def of(kind):
     return [d for d in docs if d["kind"] == kind]
 
 
+def site_value(cm, key):
+    # A ConfigMap key from data, or decoded from binaryData (Site Config).
+    if key in cm.get("data", {}):
+        return cm["data"][key]
+    return base64.b64decode(cm.get("binaryData", {}).get(key, "")).decode(errors="replace")
+
+
 def named(kind, name):
     return next((d for d in of(kind) if d["metadata"]["name"] == name), None)
 
@@ -51,6 +70,13 @@ check("namespace enforces Pod Security restricted", labels.get("pod-security.kub
 check("every namespaced object is in the Devcontainer Namespace",
       all(d["metadata"].get("namespace") == ns["metadata"]["name"] for d in docs if d["kind"] != "Namespace"))
 check("nothing from the Roster machinery itself is rendered as a workload", not of("ResourceSet"))
+
+check(f"the Roster has every key the ResourceSet reads ({', '.join(sorted(TOP_REQUIRED))}) and no other "
+      f"but {', '.join(sorted(TOP_OPTIONAL))}",
+      TOP_REQUIRED <= set(inputs) <= TOP_REQUIRED | TOP_OPTIONAL)
+check(f"every Roster entry has {', '.join(sorted(ADMIN_REQUIRED))} and no other key but "
+      f"{', '.join(sorted(ADMIN_OPTIONAL))}",
+      all(ADMIN_REQUIRED <= set(a) <= ADMIN_REQUIRED | ADMIN_OPTIONAL for a in roster))
 
 names = [a["name"] for a in roster]
 ports = [a["port"] for a in roster]
@@ -66,6 +92,14 @@ if roster:
           sorted(l["port"] for l in lis) == sorted(ports) and len(lis) == len(gw["spec"]["listeners"]))
     check("every Gateway listener admits only Routes from its own namespace",
           bool(lis) and all(l.get("allowedRoutes", {}).get("namespaces", {}).get("from") == "Same" for l in lis))
+    want_addr = inputs.get("gatewayAddress")
+    want_addr = None if want_addr in (None, "", "none") else want_addr
+    addrs = (gw or {}).get("spec", {}).get("addresses")
+    if want_addr:
+        check(f"the Gateway's address is pinned to the Roster's gatewayAddress {want_addr}",
+              addrs == [{"type": "IPAddress", "value": want_addr}])
+    else:
+        check("with no gatewayAddress (or `none`) the Gateway pins no address", not addrs)
 else:
     # A Gateway needs a listener; an invalid one would block pruning the last admin.
     check("an empty Roster renders no Gateway", gw is None)
@@ -109,6 +143,9 @@ for a in roster:
     check(f"[{n}] the Pod has no Kubernetes API credentials", pod.get("automountServiceAccountToken") is False)
     check(f"[{n}] pod fsGroup lets uid 1000 write the volume", psc.get("fsGroup") == 1000)
     check(f"[{n}] sshd port 2222 is exposed", any(p["containerPort"] == 2222 for p in c.get("ports", [])))
+    probe = c.get("readinessProbe", {})
+    check(f"[{n}] readiness runs devc-ready on the sshd port (an exec, not a TCP connection sshd would log)",
+          "tcpSocket" not in probe and probe.get("exec", {}).get("command") == ["devc-ready", "2222"])
 
     # Volume layout
     claims = {t["metadata"]["name"]: t for t in spec.get("volumeClaimTemplates", [])}
@@ -133,7 +170,7 @@ for a in roster:
           and named("ConfigMap", "site-config") is not None)
     cm = named("ConfigMap", "site-config")
     check(f"[{n}] each mounted CA key exists in the ConfigMap and holds a certificate",
-          cm is not None and all("BEGIN CERTIFICATE" in cm["data"].get(m["subPath"], "") for m in ca))
+          cm is not None and all("BEGIN CERTIFICATE" in site_value(cm, m["subPath"]) for m in ca))
 
     # Resources, with the Roster's overrides
     want = {k: {**DEFAULT_RESOURCES[k], **a.get("resources", {}).get(k, {})} for k in DEFAULT_RESOURCES}
@@ -202,5 +239,25 @@ for n, p in per_admin.items():
                                             for m in per_admin for a2 in roster if a2["name"] == m))
     other_kcm = [named("ConfigMap", q["kcm"]) for q in others]
     check(f"[{n}] its key is not in any other admin's key list", all(own_pub not in str(k) for k in other_kcm))
+
+# NetworkPolicy: every Devcontainer Pod is selected; ingress only from the
+# shared Gateway's Pod on sshd's port; egress to DNS and outside the Pod network.
+pols = of("NetworkPolicy")
+sel = {"app.kubernetes.io/name": "devcontainer"}
+pol = next((q for q in pols if q["spec"].get("podSelector", {}).get("matchLabels") == sel), None)
+check("a NetworkPolicy selects every Devcontainer Pod, for ingress and egress",
+      pol is not None and set(pol["spec"].get("policyTypes", [])) == {"Ingress", "Egress"}
+      and all(sel.items() <= s_["spec"]["template"]["metadata"]["labels"].items() for s_ in sts_all))
+if pol:
+    ing = pol["spec"].get("ingress", [])
+    check("ingress comes only from the shared Gateway's Pod, on port 2222",
+          len(ing) == 1 and ing[0].get("from") == [{"podSelector": {"matchLabels": {"gateway.networking.k8s.io/gateway-name": "devcontainer"}}}]
+          and ing[0].get("ports") == [{"port": 2222, "protocol": "TCP"}])
+    blocks = [t["ipBlock"] for r in pol["spec"].get("egress", []) for t in r.get("to", []) if "ipBlock" in t]
+    check("egress to addresses outside the cluster excludes the Pod network (no tunnelling into other Pods)",
+          len(blocks) == 1 and blocks[0]["cidr"] == "0.0.0.0/0" and len(blocks[0].get("except", [])) == 1)
+    dns = [r for r in pol["spec"].get("egress", []) if any("podSelector" in t for t in r.get("to", []))]
+    check("egress to other Pods is only cluster DNS on port 53",
+          len(dns) == 1 and {p_["port"] for p_ in dns[0].get("ports", [])} == {53})
 
 sys.exit(1 if failed else 0)

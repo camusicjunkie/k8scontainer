@@ -6,12 +6,17 @@
 #   DEVC_SSHD_LISTEN      listen address (0.0.0.0)
 #   DEVC_AUTHORIZED_KEYS  key list (/etc/devc/authorized_keys)
 #   DEVC_HOSTKEY_DIR      host key directory (/var/lib/devc/hostkeys)
+# sshd writes its pid file once it listens, where devc-ready looks for it.
 set -euo pipefail
+
+# shellcheck source=../lib/devc/sshd.bash
+source "$(dirname "$(readlink -f "$0")")/../lib/devc/sshd.bash"
 
 port=${DEVC_SSHD_PORT:-2222}
 listen=${DEVC_SSHD_LISTEN:-0.0.0.0}
 keys=${DEVC_AUTHORIZED_KEYS:-/etc/devc/authorized_keys}
 hostdir=${DEVC_HOSTKEY_DIR:-/var/lib/devc/hostkeys}
+pidfile=$(devc_sshd_pidfile "$port")
 user=$(id -un)
 
 if [[ $(id -u) -eq 0 ]]; then
@@ -35,7 +40,7 @@ cat >"$conf" <<CONF
 Port $port
 ListenAddress $listen
 HostKey $hostkey
-PidFile none
+PidFile $pidfile
 AuthorizedKeysFile $keys
 StrictModes no
 AuthenticationMethods publickey

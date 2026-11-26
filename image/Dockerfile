@@ -306,13 +306,14 @@ RUN --mount=type=bind,source=packages,target=/mnt/packages \
     } >/etc/devcontainer/release
 
 # Trust store: only the public bundle ships. At start devc-entrypoint merges
-# Site Config's ca/*.crt into /var/lib/devc/trust as the (capability-less) container user, so the dir is writable by anyone; the system bundle path
-# links to the generated store. Keep this after every apt install, since
+# Site Config's ca/*.crt into /var/lib/devc/trust as the (capability-less)
+# container user, dev, which owns the dir; the system bundle path links to the
+# generated store. Keep this after every apt install, since
 # update-ca-certificates would replace the link.
 RUN install -d /usr/local/share/devc \
     && cp /etc/ssl/certs/ca-certificates.crt /usr/local/share/devc/public-ca-certificates.crt \
-    && install -d -m 0777 /var/lib/devc/trust \
-    && cp /usr/local/share/devc/public-ca-certificates.crt /var/lib/devc/trust/ca-certificates.crt \
+    && install -d -o dev -g dev -m 0755 /var/lib/devc/trust \
+    && install -o dev -g dev -m 0644 /usr/local/share/devc/public-ca-certificates.crt /var/lib/devc/trust/ca-certificates.crt \
     && ln -sf /var/lib/devc/trust/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
     REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
@@ -323,6 +324,12 @@ ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
 RUN install -d /etc/devc \
     && install -d -o dev -g dev -m 0700 /var/lib/devc/hostkeys
 EXPOSE 2222
+
+# The Release's own labels: release/cut.sh copies them into the Review Packet.
+# Last, so a new version or commit doesn't invalidate the cached layers above.
+LABEL org.opencontainers.image.title="Standard Image" \
+      org.opencontainers.image.version="${DEVC_VERSION}" \
+      org.opencontainers.image.revision="${DEVC_GIT_SHA}"
 
 USER dev
 WORKDIR /home/dev

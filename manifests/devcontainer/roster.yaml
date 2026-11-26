@@ -9,8 +9,19 @@
 #   resources  optional overrides of the Pod's requests and limits
 #              (any of requests.cpu, requests.memory, limits.cpu, limits.memory)
 #
-# storageClass (optional, beside image) names the StorageClass of every admin's
-# volume; without it each claim takes the cluster's default class.
+# storageClass (optional, beside imageTag) names the StorageClass of every admin's
+# volume; without it each claim takes the cluster's default class. Set it once,
+# before the first admin: a StatefulSet's claim template can't change, so a
+# later change stops the ResourceSet applying for every admin (admin guide).
+#
+# gatewayAddress pins the shared Gateway's IP. It comes from the network's
+# runtime facts (DEVCONTAINER_GATEWAY_ADDRESS); unset or empty, it is `none`
+# and the load balancer picks. Never empty here: Flux substitutes after
+# kustomize has dropped the quotes, so an empty value would become null.
+#
+# Values written as Flux variables are each network's runtime facts, filled in
+# by the Kustomization that syncs this directory (postBuild.substituteFrom
+# flux-runtime-info in the Gitops repository); tests/site/facts.env lists them.
 #
 # A Static ResourceSetInputProvider keeps the Roster a plain file: its
 # defaultValues are the single input set the ResourceSet renders from.
@@ -22,10 +33,16 @@ metadata:
 spec:
   type: Static
   defaultValues:
-    # The Standard Image every Pod runs. The marker comment is the setter the
-    # existing image automation rewrites to the newest Release tag chosen by
-    # ImagePolicy devcontainer/devcontainer-standard (image-automation.yaml).
-    image: harbor.example/devcontainer/standard:0.1.0 # {"$imagepolicy": "devcontainer:devcontainer-standard"}
+    # The Standard Image every Pod runs, in two parts so that no network's
+    # Registry host is ever committed. imageRepository is the network's
+    # Registry, from its runtime facts. imageTag is the one value the image
+    # automation rewrites, to the newest Release tag chosen by ImagePolicy
+    # devcontainer/devcontainer-standard (image-automation.yaml); Release tags
+    # are the same on every network, so this line never conflicts when the
+    # repository is carried to another one.
+    imageRepository: ${HARBOR_REGISTRY}/${HARBOR_PROJECT}/devcontainer/standard
+    imageTag: 0.1.0 # {"$imagepolicy": "devcontainer:devcontainer-standard:tag"}
+    gatewayAddress: ${DEVCONTAINER_GATEWAY_ADDRESS:=none}
     admins:
       - name: admin
         port: 2201

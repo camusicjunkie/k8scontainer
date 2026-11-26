@@ -162,6 +162,11 @@ else:
           "tests/all.sh --files" in "\n".join(cfg.get("checks", {}).get("script", [])))
     check("Harbor credentials appear only in the publish job", all(
         "HARBOR" not in yaml.dump(j) for n, j in cfg.items() if isinstance(j, dict) and n != "publish"))
+    candidate = str(cfg.get("variables", {}).get("CANDIDATE", ""))
+    check("each pipeline has its own candidate tag (a branch and a tag pipeline on one commit never share it)",
+          "$CI_PIPELINE_ID" in candidate)
+    check("no password is passed on a command line (logins read it from stdin)",
+          not re.search(r"--password[ =]\"|--(src|dest)-creds|--creds", text))
     check("every literal image is pinned to a version", all(
         ":" in str(j["image"] if isinstance(j["image"], str) else j["image"]["name"]) and "latest" not in str(j["image"])
         for j in cfg.values() if isinstance(j, dict) and "image" in j and "$" not in str(j["image"])))

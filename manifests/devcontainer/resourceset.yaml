@@ -37,6 +37,15 @@ spec:
       namespace: devcontainer
     spec:
       gatewayClassName: istio
+      # The Roster's gatewayAddress, unless it is `none`, pins the LoadBalancer
+      # IP, so the address in every Workstation's SSH config survives the
+      # Gateway being recreated. Otherwise the load balancer picks one.
+      <<- $addr := get inputs "gatewayAddress" >>
+      <<- if and $addr (ne $addr "none") >>
+      addresses:
+        - type: IPAddress
+          value: << $addr >>
+      <<- end >>
       # Istio merges this ConfigMap into the gateway Deployment it generates
       # (gateway-options.yaml), so the gateway Pod passes Pod Security.
       infrastructure:
@@ -152,10 +161,11 @@ spec:
               type: RuntimeDefault
           containers:
             - name: devcontainer
-              # One image for every admin, set in the Roster (the marked line
-              # the image automation rewrites). OnDelete means a new value
-              # reaches a Pod only when its admin restarts it.
-              image: << inputs.image >>
+              # One image for every admin, set in the Roster: the site's
+              # Registry repository and the tag the image automation rewrites.
+              # OnDelete means a new tag reaches a Pod only when its admin
+              # restarts it.
+              image: << inputs.imageRepository >>:<< inputs.imageTag >>
               imagePullPolicy: IfNotPresent
               ports:
                 - name: ssh
@@ -172,9 +182,13 @@ spec:
                 limits:
                   cpu: << dig "resources" "limits" "cpu" "2" $a | quote >>
                   memory: << dig "resources" "limits" "memory" "4Gi" $a | quote >>
+              # Ready once sshd listens on 2222 (devc-ready reads devc-sshd's
+              # pid file). Not tcpSocket, which sshd logs as a pre-auth
+              # disconnect on every probe.
               readinessProbe:
-                tcpSocket:
-                  port: ssh
+                exec:
+                  command: ["devc-ready", "2222"]
+                periodSeconds: 10
               volumeMounts:
                 - { name: state, mountPath: /home/dev/workspace, subPath: workspace }
                 - { name: state, mountPath: /home/dev/.kube, subPath: .kube }

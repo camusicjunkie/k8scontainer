@@ -7,15 +7,18 @@
 #
 # Run from Linux (WSL2) against any Docker engine. Installs:
 # - Flux with the image controllers (Flux Operator + FluxInstance),
-# - Kyverno with the Gitops repository's own policies (GITOPS_DIR), with
-#   HARBOR_REGISTRY/HARBOR_PROJECT pointing at REGISTRY so its image rewrite
-#   lands on a registry the node can pull from,
-# - the Gateway API CRDs the Gitops repository vendors (standard channel),
-# - Istio gateway-only, at the Gitops repository's istiod version, as its
-#   clusters/management/istio.yaml installs it: istio-base and istiod with no
-#   mesh, pulling from a Harbor-style mirror path (global.hub) with harbor-pull,
-#   so the devcontainer Gateway is programmed. Its LoadBalancer stays pending;
-#   tests reach its Service by port-forward.
+# - the Gateway API CRDs the Gitops repository vendors for the Management
+#   Cluster (GITOPS_DIR/clusters/management/gatewayapi, standard channel),
+# - Istio gateway-only, at the version GITOPS_DIR/clusters/management/istio.yaml
+#   pins, as that file installs it: istio-base and istiod with no mesh, pulling
+#   from a Harbor-style mirror path (global.hub) with harbor-pull, so the
+#   Devcontainer Namespace's Gateway is programmed. Its LoadBalancer stays
+#   pending; tests reach its Service by port-forward.
+# - No Kyverno: the Management Cluster runs none. As the Gitops repository's
+#   clusters/management/devcontainer.yaml does, harbor-pull is put in
+#   istio-system and in the Devcontainer Namespace, on its default
+#   ServiceAccount, and the Roster names REGISTRY directly (tests/kind/flux.yaml
+#   substitutes it as a runtime fact), so nothing rewrites images.
 #
 # REGISTRY is a plain-HTTP registry on DOCKER_NETWORK; the node joins that
 # network, so it can also reach a Git server there (the local GitLab).
@@ -41,10 +44,11 @@ if [[ ${1:-} == --down ]]; then kind delete cluster --name "$name"; exit; fi
 for t in kind kubectl flux-operator docker envsubst; do
     command -v "$t" >/dev/null || { echo "missing: $t"; exit 1; }
 done
-[[ -d $gitops/apps/kyverno/configs ]] || { echo "GITOPS_DIR has no apps/kyverno/configs: $gitops"; exit 1; }
-! grep -rq 'request\.object\.metadata\.namespace' "$gitops/apps/kyverno/configs" \
-    || { echo "GITOPS_DIR's image rewrite policy predates the request.namespace fix: $gitops"; exit 1; }
-istio=$(sed -n 's/^ *tag: "\([^"]*\)".*/\1/p' "$gitops/apps/istio/controllers/istiod/ocirepository.yaml")
+mgmt=$gitops/clusters/management
+[[ -f $mgmt/istio.yaml && -f $mgmt/gatewayapi/crds.yaml ]] \
+    || { echo "GITOPS_DIR has no clusters/management/istio.yaml and gatewayapi/crds.yaml (camusicjunkie/Gitops#3): $gitops"; exit 1; }
+istio=$(sed -n 's/^ *tag: "\([^"]*\)".*/\1/p' "$mgmt/istio.yaml" | sort -u)
+[[ $istio != *$'\n'* ]] || { echo "GITOPS_DIR's istio.yaml pins more than one Istio version: $istio"; exit 1; }
 [[ $istio =~ ^1\.([0-9]+)\. ]] && ((BASH_REMATCH[1] >= 31)) \
     || { echo "GITOPS_DIR pins Istio $istio; TCPRoute v1 needs 1.31 or later: $gitops"; exit 1; }
 
@@ -68,15 +72,15 @@ server = "http://$registry"
 EOF
 k() { kubectl --context "$ctx" "$@"; }
 
-echo "== Gateway API CRDs ($gitops)"
+echo "== Gateway API CRDs ($mgmt/gatewayapi)"
 # The v1.7+ bundle's safe-upgrades policy refuses changing channel; a cluster on
 # the other channel drops it first, and the vendored bundle brings it back.
-want=$(sed -n 's/^ *gateway\.networking\.k8s\.io\/channel: //p' "$gitops/apps/istio/controllers/gatewayapi/crds.yaml" | head -1)
+want=$(sed -n 's/^ *gateway\.networking\.k8s\.io\/channel: //p' "$mgmt/gatewayapi/crds.yaml" | head -1)
 have=$(k get crd gateways.gateway.networking.k8s.io -o jsonpath='{.metadata.annotations.gateway\.networking\.k8s\.io/channel}' 2>/dev/null)
 if [[ -n $have && $have != "$want" ]]; then
     k delete validatingadmissionpolicybinding,validatingadmissionpolicy safe-upgrades.gateway.networking.k8s.io --ignore-not-found >/dev/null
 fi
-k apply --server-side --force-conflicts -f "$gitops/apps/istio/controllers/gatewayapi/crds.yaml" >/dev/null
+k apply --server-side --force-conflicts -f "$mgmt/gatewayapi/crds.yaml" >/dev/null
 
 echo "== Flux"
 k apply --server-side -f https://github.com/controlplaneio-fluxcd/flux-operator/releases/download/v0.63.0/install.yaml >/dev/null
@@ -103,39 +107,33 @@ spec:
 EOF
 k -n flux-system wait fluxinstance/flux --for=condition=Ready --timeout 300s
 
-echo "== Kyverno and the Gitops repository's policies ($gitops)"
-# v1.19.0: what the Gitops repository's chart pin (3.9.0) installs; it serves
-# the policies.kyverno.io/v1 CEL policies the Gitops repository now uses.
-k apply --server-side -f https://github.com/kyverno/kyverno/releases/download/v1.19.0/install.yaml >/dev/null
-k -n kyverno rollout status deploy/kyverno-admission-controller --timeout 300s
-k -n kyverno rollout status deploy/kyverno-background-controller --timeout 300s
-# What the policies read: the cluster settings the laptop cluster uses, with
-# the registry swapped for this one, and the pull secret the Gitops repository
-# keeps in flux-system for Kyverno to copy into each namespace.
-export KYVERNO_VALIDATION_ACTION=Audit HARBOR_REGISTRY=$registry HARBOR_PROJECT=$harbor_project
-k -n flux-system create secret docker-registry harbor-pull --docker-server "$registry" \
-    --docker-username kind --docker-password kind --dry-run=client -o yaml | k apply -f - >/dev/null
-# One local change, printed: local-path-storage, flux-system and kyverno join
-# the exclusions. Here their images come from public registries and are not
-# mirrored to REGISTRY; on the Management Cluster they already come from Harbor.
-# The policies are CEL (policies.kyverno.io/v1); a cluster set up before they
-# were still has the ClusterPolicies they replaced, which would keep rewriting.
-k delete clusterpolicy --all --ignore-not-found >/dev/null 2>&1 || true
-k kustomize "$gitops/apps/kyverno/configs" \
-    | envsubst '$KYVERNO_VALIDATION_ACTION $HARBOR_REGISTRY $HARBOR_PROJECT' \
-    | sed -E "s/kube-node-lease('+)\]\)/kube-node-lease\1, \1local-path-storage\1, \1flux-system\1, \1kyverno\1])/" \
-    | tee "${TMPDIR:-/tmp}/devc-kind-policies.yaml" | k apply -f -
-echo "local changes to the Gitops policies:"
-k kustomize "$gitops/apps/kyverno/configs" \
-    | envsubst '$KYVERNO_VALIDATION_ACTION $HARBOR_REGISTRY $HARBOR_PROJECT' \
-    | diff - "${TMPDIR:-/tmp}/devc-kind-policies.yaml" | grep '^[<>]' || true
-k wait mutatingpolicy,validatingpolicy,generatingpolicy --all --for=jsonpath='{.status.conditionStatus.ready}'=true --timeout 120s
+echo "== harbor-pull"
+# The Management Cluster's bootstrap keeps harbor-pull in flux-system, and the
+# Gitops repository's ResourceSets copy it into istio-system and the
+# Devcontainer Namespace (copyFrom). REGISTRY needs no login; the Secret is
+# here so the Pods reference it exactly as they do there.
+pull_secret() {  # pull_secret NAMESPACE
+    # Created only if missing: applying a bare Namespace over namespace.yaml's
+    # would drop the labels that apply had set (Pod Security restricted).
+    k get namespace "$1" >/dev/null 2>&1 || k create namespace "$1" >/dev/null
+    k -n "$1" create secret docker-registry harbor-pull --docker-server "$registry" \
+        --docker-username kind --docker-password kind --dry-run=client -o yaml | k apply -f - >/dev/null
+}
+pull_secret flux-system
+pull_secret istio-system
+# A cluster set up before the Management Cluster dropped Kyverno still has it;
+# its image rewrite would hide a Roster that doesn't name REGISTRY.
+if k get namespace kyverno >/dev/null 2>&1; then
+    echo "removing Kyverno left over from an earlier setup"
+    k delete mutatingpolicy,validatingpolicy,generatingpolicy --all --ignore-not-found >/dev/null 2>&1 || true
+    k delete clusterpolicy --all --ignore-not-found >/dev/null 2>&1 || true
+    k delete -f https://github.com/kyverno/kyverno/releases/download/v1.19.0/install.yaml --ignore-not-found >/dev/null 2>&1 || true
+fi
 
 echo "== Istio $istio, gateway only"
 # The images go where the Harbor mirror keeps them (<project>/istio/pilot,
 # .../proxyv2) and istiod points global.hub there, as on the Management
-# Cluster; the image rewrite leaves images already on REGISTRY alone. Istio
-# 1.31+ publishes images on Docker Hub and charts on ghcr.io.
+# Cluster. Istio 1.31+ publishes images on Docker Hub and charts on ghcr.io.
 crane() { docker run --rm --network "$network" gcr.io/go-containerregistry/crane:v0.22.1 "$@" --insecure; }
 crane copy "docker.io/istio/pilot:$istio" "$registry/$harbor_project/istio/pilot:$istio" >/dev/null
 crane copy "docker.io/istio/proxyv2:$istio" "$registry/$harbor_project/istio/proxyv2:$istio" >/dev/null
@@ -145,7 +143,6 @@ docker run --rm -v "$charts:/o" --entrypoint sh alpine/helm:3.16.4 -c "
         --set defaultRevision=default >/o/base.yaml &&
     helm template istiod oci://ghcr.io/istio/release/charts/istiod --version $istio -n istio-system --set defaultRevision=default \
         --set global.hub=$registry/$harbor_project/istio --set 'global.imagePullSecrets[0]=harbor-pull' >/o/istiod.yaml"
-k create namespace istio-system --dry-run=client -o yaml | k apply -f - >/dev/null
 k apply --server-side --force-conflicts -f "$charts/base.yaml" >/dev/null
 k apply --server-side --force-conflicts -f "$charts/istiod.yaml" >/dev/null
 rm -rf "$charts"
@@ -157,13 +154,23 @@ if [[ -n ${GIT_URL:-} ]]; then
     [[ -f $state/id_rsa ]] || ssh-keygen -q -t rsa -b 2048 -N '' -C test-smartcard -f "$state/id_rsa"
     k -n flux-system create secret generic devc-git-read --from-literal=username="${GIT_USER:?}" \
         --from-literal=password="${GIT_TOKEN:?}" --dry-run=client -o yaml | k apply -f - >/dev/null
-    # The automation lives in the namespace the Kustomization creates.
-    k create namespace devcontainer --dry-run=client -o yaml | k apply -f - >/dev/null
+    # As the Gitops repository's devcontainer.yaml does: it owns the
+    # Devcontainer Namespace (the manifests don't), puts harbor-pull on its
+    # default ServiceAccount (the Pods use it) with no API token, and gives the
+    # ImageRepository harbor-ca (here the test site CA; the registry is HTTP).
+    k apply -f "$here/namespace.yaml" >/dev/null
+    pull_secret devcontainer
+    k -n devcontainer create secret generic harbor-ca --from-file=ca.crt="$here/../site/site-ca.crt" \
+        --dry-run=client -o yaml | k apply -f - >/dev/null
+    k -n devcontainer patch serviceaccount default --type merge \
+        -p '{"automountServiceAccountToken":false,"imagePullSecrets":[{"name":"harbor-pull"}]}' >/dev/null
     k -n devcontainer create secret generic devc-git-push --from-literal=username="$GIT_USER" \
         --from-literal=password="${GIT_PUSH_TOKEN:-$GIT_TOKEN}" --dry-run=client -o yaml | k apply -f - >/dev/null
     export GIT_URL GIT_BRANCH GIT_PUSH_BRANCH=${GIT_PUSH_BRANCH:-$GIT_BRANCH-image-updates} \
-        REGISTRY=$registry TEST_PUBKEY=$(cat "$state/id_rsa.pub")
-    envsubst '$GIT_URL $GIT_BRANCH $GIT_PUSH_BRANCH $REGISTRY $HARBOR_PROJECT $TEST_PUBKEY' <"$here/flux.yaml" | k apply -f -
+        REGISTRY=$registry HARBOR_PROJECT=$harbor_project TEST_PUBKEY=$(cat "$state/id_rsa.pub") \
+        SITE_ENV_B64=$(base64 -w0 "$here/../site/site.env") SITE_CA_B64=$(base64 -w0 "$here/../site/site-ca.crt")
+    envsubst '$GIT_URL $GIT_BRANCH $GIT_PUSH_BRANCH $REGISTRY $HARBOR_PROJECT $TEST_PUBKEY $SITE_ENV_B64 $SITE_CA_B64' \
+        <"$here/flux.yaml" | k apply -f -
     k -n flux-system wait kustomization/devcontainer --for=condition=Ready --timeout 300s
 fi
 

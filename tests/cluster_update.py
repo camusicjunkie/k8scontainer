@@ -5,11 +5,12 @@
 
 ROSTER_FILE is the committed manifests/devcontainer/roster.yaml, read as text
 because the marker is a comment. OLD.yaml and NEW.yaml are the rendered
-output (as in cluster.sh) for two Rosters that differ only in `image`: the
+output (as in cluster.sh) for two Rosters that differ only in `imageTag`: the
 earlier tag and the later tag. Checks, from outside:
-  - the Roster's single image line carries the marker the Management Cluster's
-    image automation rewrites, naming an ImagePolicy that is rendered here and
-    selects by semver over the Registry repository the image comes from;
+  - the Roster's single imageTag line carries the tag-only marker the
+    Management Cluster's image automation rewrites (so no Registry host is
+    ever committed), naming an ImagePolicy that is rendered here and selects
+    by semver over the Roster's imageRepository;
   - changing the tag changes the Pod template image and nothing else, so with
     OnDelete a running Pod is not restarted and its volume claim is unchanged;
   - pinning an earlier tag renders (OLD is the pinned-back case of NEW).
@@ -32,17 +33,21 @@ def check(desc, ok):
         failed.append(desc)
 
 
-# The marker: exactly one image line in the Roster, with a setter comment.
-lines = [l for l in roster_text.splitlines() if re.match(r"\s+image:\s", l)]
-check("the Roster has exactly one image value", len(lines) == 1)
-m = re.match(r"\s+image:\s+(\S+)\s+#\s*(\{.*\})\s*$", lines[0]) if lines else None
-check("the image value carries an image-automation marker", m is not None)
+# The marker: exactly one imageTag line in the Roster, with a tag-only setter.
+lines = [l for l in roster_text.splitlines() if re.match(r"\s+imageTag:\s", l)]
+check("the Roster has exactly one imageTag value", len(lines) == 1)
+m = re.match(r"\s+imageTag:\s+(\S+)\s+#\s*(\{.*\})\s*$", lines[0]) if lines else None
+check("the imageTag value carries an image-automation marker", m is not None)
+repos = re.findall(r"(?m)^\s+imageRepository:\s+(\S+)\s*$", roster_text)
+check("the Roster has exactly one imageRepository value, with no tag", len(repos) == 1 and ":" not in repos[0].rpartition("/")[2])
+ref = repos[0] if repos else None
 policy_ref = None
 if m:
-    ref, marker = m.group(1), json.loads(m.group(2))
-    policy_ref = marker.get("$imagepolicy")
-    check("the marker is a whole-image $imagepolicy setter (namespace:name)",
-          list(marker) == ["$imagepolicy"] and bool(re.fullmatch(r"[a-z0-9-]+:[a-z0-9-]+", policy_ref or "")))
+    marker = json.loads(m.group(2))
+    setter = marker.get("$imagepolicy") or ""
+    check("the marker is a tag-only $imagepolicy setter (namespace:name:tag), so the automation never writes a Registry host",
+          list(marker) == ["$imagepolicy"] and bool(re.fullmatch(r"[a-z0-9-]+:[a-z0-9-]+:tag", setter)))
+    policy_ref = setter.rsplit(":", 1)[0] if setter.endswith(":tag") else None
 
 if policy_ref:
     ns, name = policy_ref.split(":")
@@ -57,7 +62,7 @@ if policy_ref:
         repo = next((d for d in new if d["kind"] == "ImageRepository"
                      and d["metadata"]["name"] == pol["spec"]["imageRepositoryRef"]["name"]), None)
         check("the policy scans an ImageRepository for the Standard Image's own Registry repository",
-              repo is not None and repo["spec"]["image"] == ref.rsplit(":", 1)[0])
+              repo is not None and repo["spec"]["image"] == ref)
         check("the repository is scanned on an interval", repo is not None and bool(repo["spec"].get("interval")))
 
 

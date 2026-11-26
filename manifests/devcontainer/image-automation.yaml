@@ -1,7 +1,7 @@
 # What the Management Cluster's image automation watches for the Standard Image.
 # ImageRepository scans this side's Harbor for tags; ImagePolicy picks the
 # newest Release tag. An ImageUpdateAutomation rewrites the one marked
-# `image:` line in roster.yaml to the policy's choice on a push branch, and
+# `imageTag` in roster.yaml to the policy's tag on a push branch, and
 # once that is merged the ResourceSet renders it into every admin's
 # StatefulSet template. It holds Git push credentials, so it is not in this
 # directory; it must sit in this namespace (it applies only ImagePolicies in
@@ -11,23 +11,25 @@
 # Rollback: pin an earlier tag by narrowing `range` to that exact version
 # (for example "0.1.0"); the automation then rewrites the Roster to it. Setting
 # `range` back to ">=0.1.0" resumes following new Releases. Editing the Roster's
-# image alone does not stick, the automation would move it forward again.
+# imageTag alone does not stick, the automation would move it forward again.
 #
-# Per site, the Kustomization that syncs this directory patches the
-# ImageRepository (tests/kind/flux.yaml does the same for kind): spec.image to
-# the site's Registry; spec.certSecretRef when the Registry's CA is private
-# (a Secret with ca.crt in this namespace: the scanner runs in a Pod and does
-# not trust what the nodes trust); spec.secretRef when it needs a pull
-# credential (a dockerconfigjson Secret in this namespace). Secrets come from
-# outside Git.
+# The repository is the network's Registry, from its runtime facts (the same
+# value as the Roster's imageRepository). The scanner runs in a Pod and does
+# not trust what the nodes trust, so it reads the Registry's CA from the
+# harbor-ca Secret (key ca.crt) and logs in with harbor-pull; the Gitops
+# repository copies both into this namespace from outside Git.
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
 metadata:
   name: devcontainer-standard
   namespace: devcontainer
 spec:
-  image: harbor.example/devcontainer/standard
+  image: ${HARBOR_REGISTRY}/${HARBOR_PROJECT}/devcontainer/standard
   interval: 5m
+  certSecretRef:
+    name: harbor-ca
+  secretRef:
+    name: harbor-pull
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImagePolicy
