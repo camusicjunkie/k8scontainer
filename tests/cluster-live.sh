@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Live cluster seam: what tests/cluster.sh can only render, run on the kind
-# cluster from tests/kind/up.sh (with GIT_URL set) under the Gitops
-# repository's Kyverno policies.
+# cluster from tests/kind/up.sh (with GIT_URL set), set up as the Management
+# Cluster is: no Kyverno, the pull secret on the default ServiceAccount.
 #
 #   tests/cluster-live.sh
 #
@@ -59,7 +59,7 @@ merge_updates() {  # merge_updates TAG
         cred="!f() { echo username=\$GIT_USER; echo password=\$GIT_PASS; }; f"
         git init -q /r && cd /r &&
         git -c credential.helper="$cred" fetch -q "$URL" "$BRANCH:synced" "$PUSH:update" &&
-        git show update:manifests/devcontainer/roster.yaml | grep -qF ":$TAG " &&
+        git show update:manifests/devcontainer/roster.yaml | grep -qE "imageTag: $TAG( |\$)" &&
         git checkout -q synced &&
         git -c user.name=reviewer -c user.email=reviewer@lab.local merge -q --no-edit \
             -m "Merge $PUSH into $BRANCH [skip ci]" update &&
@@ -95,6 +95,7 @@ check "the Pod is Ready" "pod_ready"
 check "the namespace enforces Pod Security restricted" \
     "[[ \$(k get ns $ns -o jsonpath='{.metadata.labels.pod-security\.kubernetes\.io/enforce}') == restricted ]]"
 check "the Pod runs the image from $registry" "[[ \$(pod_image) == $registry/* ]]"
+check "the image is the Roster's own, not rewritten (no Kyverno)" "[[ \$(pod_image) == \$(sts_image) ]]"
 check "the Roster's key opens a shell" "[[ \$(pod_ssh 'echo hello') == hello ]]"
 listener() { k -n $ns get gateway devcontainer -o jsonpath='{.status.listeners[?(@.name=="ssh-admin")].attachedRoutes}' 2>/dev/null; }
 check "Istio accepts the Gateway's ssh-admin listener with its TCPRoute attached" "until_true 180 '[[ \$(listener) == 1 ]]'"
