@@ -75,7 +75,7 @@ The zip is fetched without TLS verification (Supervisors usually carry their own
    | the Remote-SSH VSIX | the one extension the installer installs, at the version `VSCODE_REMOTE_SSH_VERSION` in `vscode.env` pins; record it in `release.json` |
    | `SHA256SUMS` | `sha256sum` format (`<hash>  <relative path>`), covering every file above except `install.ps1` and `SHA256SUMS` itself |
 
-   The installer refuses the pack if any covered file is missing or mismatched, if a file it uses is not covered, if `release.json`'s VS Code commit or version differs from `vscode.env`, if the zip is not the pinned one, or if the Release carries any extension other than Remote-SSH. Run `install.ps1` once on a test Workstation before carrying the pack. **Unverified:** a real portable VS Code download and `code.cmd`, installing the real VSIX offline, and the real Remote-SSH version check.
+   The installer refuses the pack if any covered file is missing or mismatched, if a file it uses is not covered, if `release.json`'s VS Code commit or version differs from `vscode.env`, if the zip is not the pinned one, if the Release carries any extension other than Remote-SSH, or if its Remote-SSH version is not `VSCODE_REMOTE_SSH_VERSION`. Run `install.ps1` once on a test Workstation before carrying the pack. **Unverified:** a real portable VS Code download and `code.cmd`, installing the real VSIX offline, and the real Remote-SSH version check.
 5. **Carry across.** Move the archive, its `.sha256` file, the Workstation pack and the Review Packet through your transfer process. Only the archive and checksum are needed to import.
 
 ## Importing on the Disconnected Side

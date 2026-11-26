@@ -34,7 +34,7 @@ BeforeAll {
         Copy-Item (Join-Path $script:Repo 'workstation\install.ps1') $pack -ErrorAction SilentlyContinue
         $zipSha = Get-Sha (Join-Path $pack $zip)
         Set-Content -Encoding ASCII -Path (Join-Path $pack 'vscode.env') -Value @(
-            'VSCODE_VERSION=1.140.0', "VSCODE_COMMIT=$EnvCommit", "VSCODE_WIN_SHA256=$zipSha")
+            'VSCODE_VERSION=1.140.0', "VSCODE_COMMIT=$EnvCommit", "VSCODE_WIN_SHA256=$zipSha", 'VSCODE_REMOTE_SSH_VERSION=1.2.3')
         $rel = @{
             version = '2026.11.1'
             vscode = @{ version = '1.140.0'; commit = $script:Commit; zip = $zip }
@@ -158,6 +158,14 @@ Describe 'install.ps1' {
             $rel | ConvertTo-Json -Depth 5 | Set-Content -Encoding ASCII (Join-Path $Pack 'release.json')
             Write-Sums $Pack
             { Invoke-Install $Pack } | Should -Throw '*Remote-SSH*'
+        }
+        It 'refuses a Remote-SSH version that is not the one pinned in vscode.env, naming both' {
+            $e = Join-Path $Pack 'vscode.env'
+            (Get-Content $e) -replace 'VSCODE_REMOTE_SSH_VERSION=.*', 'VSCODE_REMOTE_SSH_VERSION=1.2.4' | Set-Content -Encoding ASCII $e
+            Write-Sums $Pack
+            { Invoke-Install $Pack } | Should -Throw '*1.2.3*1.2.4*'
+            Test-Path (Join-Path $TestDrive 'dest') | Should -BeFalse
+            Test-Path (Join-Path $TestDrive 'ssh') | Should -BeFalse
         }
         It 'rejects a bad port' {
             { Invoke-Install $Pack @{ Port = 70000 } } | Should -Throw
