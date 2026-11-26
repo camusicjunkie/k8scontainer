@@ -1,0 +1,823 @@
+{
+ "results": [
+  {
+   "extensions": [
+    {
+     "publisher": {
+      "publisherName": "redhat"
+     },
+     "extensionName": "vscode-yaml",
+     "versions": [
+      {
+       "version": "2.1.2026112008",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.91.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "2.1.2026111808",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.91.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "2.1.2026111208",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.91.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "2.1.2026110608",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.91.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "2.1.2026110508",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.91.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "2.1.2026102308",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.91.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "2.1.2026102108",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.91.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "2.1.2026102008",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.91.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "2.1.2026101708",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.91.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "2.0.2026101608",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.91.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "2.0.2026101408",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.90.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "2.0.0",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.91.0"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026101008",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.90.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026100908",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026100808",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026100608",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026100308",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026100208",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026092908",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026092308",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026092208",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026091908",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026090408",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026090108",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026082008",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026081908",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026081408",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026080708",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026080108",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026073109",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026073008",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026072408",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026072308",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026072108",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026071808",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026071708",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026071508",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.2026070808",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.25.0",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.90.0"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026070709",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026063009",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026062509",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026062409",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026062009",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026061809",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026061609",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026061309",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026061109",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026060909",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026060608",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026060409",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026060309",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026060209",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026053008",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026052909",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026052809",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026052609",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026052209",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026052009",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026051608",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026050908",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.2026050808",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "1.24.0",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.63.0"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

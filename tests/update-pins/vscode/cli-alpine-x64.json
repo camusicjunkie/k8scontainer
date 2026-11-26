@@ -1,0 +1,10 @@
+{
+ "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/661626d0e72f97806550790a98fb87116c9db825/vscode_cli_alpine_x64_cli.tar.gz",
+ "name": "1.148.0",
+ "version": "661626d0e72f97806550790a98fb87116c9db825",
+ "productVersion": "1.148.0",
+ "hash": "2a3f9fe701691097770f0959f24531e14ed46302",
+ "timestamp": 1795524073017,
+ "sha256hash": "2b31f4889230c5a70eeba92ff94c90a448c6c20f831c6aa542c89423b25496ae",
+ "supportsFastUpdate": true
+}

@@ -1,0 +1,299 @@
+{
+ "results": [
+  {
+   "extensions": [
+    {
+     "publisher": {
+      "publisherName": "GitLab"
+     },
+     "extensionName": "gitlab-workflow",
+     "versions": [
+      {
+       "version": "7.10.0",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "7.9.0",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "7.8.0",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "7.7.4",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "7.7.3",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "7.7.2",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "7.7.1",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        }
+       ]
+      },
+      {
+       "version": "7.7.0",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "7.6.1",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "7.6.0",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "7.5.0",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "7.4.5",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "7.4.4",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "7.4.3",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        }
+       ]
+      },
+      {
+       "version": "7.4.2",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "7.4.1",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "7.4.0",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "7.3.5",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        }
+       ]
+      },
+      {
+       "version": "7.3.4",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "7.3.3",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "7.3.2",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "7.3.1",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        },
+        {
+         "key": "Microsoft.VisualStudio.Code.PreRelease",
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "version": "7.3.0",
+       "properties": [
+        {
+         "key": "Microsoft.VisualStudio.Code.Engine",
+         "value": "^1.106.0"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

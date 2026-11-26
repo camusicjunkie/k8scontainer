@@ -1,0 +1,3 @@
+Name:      ghcr.io/homebrew/brew:7.0.16
+MediaType: application/vnd.oci.image.index.v1+json
+Digest:    sha256:af4248b6688e954119fc2f61fbd8a26ea85d309df91ac065913d423c57a04549

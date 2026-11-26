@@ -49,6 +49,7 @@ image/                    the Standard Image
 └── rootfs/               files copied into the image as-is: commands, shell setup, self-test
 .gitlab-ci.yml            build → selftest + checks → publish (Release tags only)
 release/
+├── update-pins.py        Connected Side: refreshes every exact pin from upstream, as a diff to review
 ├── cut.sh                Connected Side: Harbor image → archive + checksum + Review Packet
 └── import.sh             Disconnected Side: archive → Harbor, with the digest unchanged
 manifests/devcontainer/   what Flux applies on the Management Cluster
@@ -291,6 +292,7 @@ tests/all.sh --files   # the file checks only: what CI's `checks` job runs
 |---|---|---|
 | `tests/ci.py` | what the pipeline does per ref: build and test always, publish only on Release tags, only the tested image | Python + PyYAML |
 | `tests/repo.py` | every Pod-side path the image reads is mounted or shipped; base images pinned by digest; glossary terms in comments; ticket hygiene | Python |
+| `tests/update-pins.py` | `release/update-pins.py` against recorded upstream responses (`tests/update-pins/`): each pin file rewritten exactly, nothing written when nothing changed or a lookup fails, one group alone, pre-releases and extensions the VS Code can't run skipped | Python |
 | `docs/check.sh` | docs use glossary terms, cite paths that exist, and state facts that match the code | bash |
 | `tests/lint.sh` | shellcheck at warning severity on every shell script (by extension or shebang); hadolint on `image/Dockerfile`, at the version `HADOLINT_IMAGE` pins | shellcheck, hadolint |
 | `tests/image.sh` | builds the image; runs `devc-selftest` with no network as `dev` | Docker |
