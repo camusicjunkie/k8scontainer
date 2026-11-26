@@ -93,7 +93,8 @@ devc-entrypoint                    refuses to run as root
 
 | In `image/rootfs` | Role |
 |---|---|
-| `usr/local/bin/devc-entrypoint`, `devc-ca-refresh`, `devc-sshd` | start-up, above |
+| `usr/local/bin/devc-entrypoint`, `devc-ca-refresh`, `devc-sshd`, `usr/local/lib/devc/sshd.bash` | start-up, above |
+| `usr/local/bin/devc-ready` | the Pod's readiness probe: sshd's pid file names a live process |
 | `usr/local/bin/secrets`, `with-secrets`, `devc-vault-pass`, `usr/local/lib/devc/secrets.bash` | the Secrets File ([section 6](#6-admin-state)) |
 | `usr/local/bin/klogin`, `etc/bash.bashrc.d/50-klogin-completion.sh` | log in to vSphere Supervisors and Guest Clusters |
 | `usr/local/bin/codex`, `etc/codex/config.toml` | wraps the Codex CLI so it talks only to the site's AI gateway, with only its key from the Secrets File |
@@ -267,7 +268,7 @@ Several values appear on more than one side. If they drift apart, the parts stil
 | Value | Where it must match | What catches a mismatch |
 |---|---|---|
 | VS Code commit | `image/packages/vscode.env` ↔ the server baked into the image ↔ the Workstation pack's `release.json` and zip | the image build (server checksum) and `install.ps1` (refuses another commit or zip) |
-| sshd port 2222 | `devc-sshd` ↔ the Dockerfile's `EXPOSE` ↔ the ResourceSet's `containerPort`, Services, TCPRoute and readiness probe (`/tmp/devc-sshd-2222.pid`) ↔ the NetworkPolicy's ingress port | `tests/image.sh`, `tests/cluster_policy.py` |
+| sshd port 2222 | `devc-sshd` ↔ the Dockerfile's `EXPOSE` ↔ the ResourceSet's `containerPort`, Services, TCPRoute and readiness probe (`devc-ready 2222`) ↔ the NetworkPolicy's ingress port | `tests/image.sh`, `tests/cluster_policy.py` |
 | Runtime facts | every Flux variable in `manifests/` ↔ `tests/site/facts.env` ↔ the Gitops repository's bootstrap (`flux-runtime-info`) ↔ the README's "Runtime facts" table | `tests/repo.py`, `docs/check.sh`; strict substitution fails the sync on a missing one |
 | Registry repository | the Roster's `imageRepository` ↔ the ImageRepository's `spec.image`, the same runtime facts | `tests/cluster_update.py`, `tests/cluster-live.sh` |
 | Pod CIDR | the NetworkPolicy's egress `except` (`DEVCONTAINER_POD_CIDR`) ↔ the cluster's own Pod network | e2e checklist section 2 |

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# devc-ready PORT: exits 0 once devc-sshd listens on PORT, that is, once its pid
+# file names a live process. The Pod's readiness probe runs this rather than
+# connecting, which sshd would log as a pre-auth disconnect on every probe.
+set -euo pipefail
+
+# shellcheck source=../lib/devc/sshd.bash
+source "$(dirname "$(readlink -f "$0")")/../lib/devc/sshd.bash"
+
+if [[ $# -ne 1 ]]; then
+    echo "usage: devc-ready PORT" >&2
+    exit 2
+fi
+
+pidfile=$(devc_sshd_pidfile "$1")
+[[ -s $pidfile ]] && kill -0 "$(<"$pidfile")" 2>/dev/null

@@ -126,8 +126,8 @@ for a in roster:
     check(f"[{n}] pod fsGroup lets uid 1000 write the volume", psc.get("fsGroup") == 1000)
     check(f"[{n}] sshd port 2222 is exposed", any(p["containerPort"] == 2222 for p in c.get("ports", [])))
     probe = c.get("readinessProbe", {})
-    check(f"[{n}] readiness reads sshd's pid file for port 2222 (an exec, not a TCP connection sshd would log)",
-          "tcpSocket" not in probe and "/tmp/devc-sshd-2222.pid" in " ".join(probe.get("exec", {}).get("command", [])))
+    check(f"[{n}] readiness runs devc-ready on the sshd port (an exec, not a TCP connection sshd would log)",
+          "tcpSocket" not in probe and probe.get("exec", {}).get("command") == ["devc-ready", "2222"])
 
     # Volume layout
     claims = {t["metadata"]["name"]: t for t in spec.get("volumeClaimTemplates", [])}

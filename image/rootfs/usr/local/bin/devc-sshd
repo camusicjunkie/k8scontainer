@@ -6,17 +6,17 @@
 #   DEVC_SSHD_LISTEN      listen address (0.0.0.0)
 #   DEVC_AUTHORIZED_KEYS  key list (/etc/devc/authorized_keys)
 #   DEVC_HOSTKEY_DIR      host key directory (/var/lib/devc/hostkeys)
-#   DEVC_SSHD_PIDFILE     pid file, written once sshd listens
-#                         (/tmp/devc-sshd-<port>.pid). The Pod's readiness
-#                         probe reads it rather than connecting, which would
-#                         log a pre-auth disconnect every few seconds.
+# sshd writes its pid file once it listens, where devc-ready looks for it.
 set -euo pipefail
+
+# shellcheck source=../lib/devc/sshd.bash
+source "$(dirname "$(readlink -f "$0")")/../lib/devc/sshd.bash"
 
 port=${DEVC_SSHD_PORT:-2222}
 listen=${DEVC_SSHD_LISTEN:-0.0.0.0}
 keys=${DEVC_AUTHORIZED_KEYS:-/etc/devc/authorized_keys}
 hostdir=${DEVC_HOSTKEY_DIR:-/var/lib/devc/hostkeys}
-pidfile=${DEVC_SSHD_PIDFILE:-/tmp/devc-sshd-$port.pid}
+pidfile=$(devc_sshd_pidfile "$port")
 user=$(id -un)
 
 if [[ $(id -u) -eq 0 ]]; then

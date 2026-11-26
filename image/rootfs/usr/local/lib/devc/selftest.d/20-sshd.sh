@@ -18,7 +18,7 @@ ssh-keygen -q -t ed25519 -N '' -f "$ssh_tmp/good"
 ssh-keygen -q -t ed25519 -N '' -f "$ssh_tmp/bad"
 cp "$ssh_tmp/good.pub" "$ssh_tmp/authorized_keys"
 DEVC_SSHD_PORT=$ssh_port DEVC_SSHD_LISTEN=127.0.0.1 DEVC_AUTHORIZED_KEYS=$ssh_tmp/authorized_keys \
-    DEVC_HOSTKEY_DIR=$ssh_tmp/hostkeys DEVC_SSHD_PIDFILE=$ssh_tmp/sshd.pid devc-sshd >"$ssh_tmp/sshd.log" 2>&1 &
+    DEVC_HOSTKEY_DIR=$ssh_tmp/hostkeys devc-sshd >"$ssh_tmp/sshd.log" 2>&1 &
 for _ in $(seq 40); do
     (exec 3<>"/dev/tcp/127.0.0.1/$ssh_port") 2>/dev/null && break
     sleep 0.25
@@ -53,6 +53,7 @@ check "sshd refuses every other user" sshd_other_user_refused
 check "sshd offers no password login" sshd_password_refused
 check "sshd forwards the client's agent" sshd_agent_forwarded
 check "sshd forwards TCP connections" sshd_tcp_forwarded
-sshd_pidfile_live() { [[ -s $ssh_tmp/sshd.pid ]] && kill -0 "$(cat "$ssh_tmp/sshd.pid")"; }
-check "sshd writes a pid file naming its live process (the readiness probe reads it)" sshd_pidfile_live
+check "devc-ready reports sshd ready on its port (the readiness probe runs it)" devc-ready "$ssh_port"
+sshd_other_port_not_ready() { ! devc-ready $((ssh_port + 1)); }
+check "devc-ready reports a port no sshd listens on as not ready" sshd_other_port_not_ready
 check "sshd created its host key at the mounted path" test -s "$ssh_tmp/hostkeys/ssh_host_ed25519_key"

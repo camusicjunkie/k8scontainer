@@ -182,12 +182,12 @@ spec:
                 limits:
                   cpu: << dig "resources" "limits" "cpu" "2" $a | quote >>
                   memory: << dig "resources" "limits" "memory" "4Gi" $a | quote >>
-              # Ready once sshd listens: devc-sshd's pid file names a live
-              # process. Not tcpSocket, which sshd logs as a pre-auth
+              # Ready once sshd listens on 2222 (devc-ready reads devc-sshd's
+              # pid file). Not tcpSocket, which sshd logs as a pre-auth
               # disconnect on every probe.
               readinessProbe:
                 exec:
-                  command: ["bash", "-c", 'kill -0 "$(cat /tmp/devc-sshd-2222.pid)"']
+                  command: ["devc-ready", "2222"]
                 periodSeconds: 10
               volumeMounts:
                 - { name: state, mountPath: /home/dev/workspace, subPath: workspace }
