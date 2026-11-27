@@ -27,7 +27,15 @@ The zip is fetched without TLS verification (Supervisors usually carry their own
 
 **`candidate` images accumulate.** Every pipeline pushes `candidate:<commit sha>-<pipeline id>` to the project's Container Registry. Add a registry cleanup policy for that repository or it grows without bound.
 
-**DHI login.** The DHI base's registry (`dhi.io`) needs a login: set `DHI_USER` and `DHI_PASSWORD` (masked, and raw if the token contains `$`) to a Docker account entitled to the base, and the build logs in before it pulls. Without them the build fails at the first DHI stage with `authentication required`.
+**DHI login.** The DHI base's registry (`dhi.io`) needs a login: set `DHI_USER` and `DHI_PASSWORD` (masked, and raw if the token contains `$`) to a Docker account entitled to the base, and the build logs in before it pulls. Without them the build fails at the first DHI stage with `authentication required`. Make `DHI_PASSWORD` a Docker access token with Repo Read-only permission and an expiry date, not the account password: DHI images are not public, so Repo Public Read-only cannot pull them.
+
+**Set secrets from a file, never on a command line or in a chat.** A value typed on a command line stays in shell history, and one typed into an AI assistant's chat stays in its session log. Save the secret to a file outside the repository, then feed it in on stdin and delete the file:
+
+```sh
+tr -d '\r\n' < secret.txt | glab variable update DHI_PASSWORD --masked   # glab variable set for a new one
+tr -d '\r\n' < secret.txt | docker login dhi.io -u <user> --password-stdin
+rm secret.txt
+```
 
 **Checked on a local GitLab CE with a docker-executor runner set up as above:** a branch push runs `build`, `checks` and `selftest`; the self-test passes all its checks under rootless isolation with `--network none` (chroot isolation leaves the network up); a `v0.0.1` tag also runs `publish`, and the Harbor tag carries the same digest as the `candidate` that passed. The build also needs Internet and Marketplace access (it fetches the VS Code server and extensions), which is why it runs only on the Connected Side.
 
