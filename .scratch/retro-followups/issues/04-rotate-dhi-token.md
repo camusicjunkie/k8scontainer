@@ -6,7 +6,7 @@
 
 **Status:** ready-for-human
 
-- [ ] A new DHI token is issued and the old one is revoked
+- [x] A new DHI token is issued and the old one is revoked
 - [x] `DHI_PASSWORD` on the local GitLab and the Docker login on each build host use the new token
 - [ ] The old session log is deleted or the token is redacted from it
 - [x] The Release Owner guide says to set CI secrets from a file or a prompt (`glab variable set NAME < file`), never on a command line or in a chat
@@ -21,4 +21,5 @@
 - A new Docker access token, Repo Read-only, issued by the Release Owner and saved to a file, never shown in the chat. `DHI_PASSWORD` on the local GitLab updated from the file (masked; 36 characters, `dckr_` prefix, checked through the API without printing the value). This workstation's `docker login dhi.io` uses it; `docker buildx imagetools inspect` on the DHI base succeeded against the registry. The file is deleted. This workstation is the only build host so far.
 - `docs/release-owner-guide.md`, "One-time setup": DHI_PASSWORD is a Repo Read-only access token with an expiry, and secrets are set from a file on stdin, never on a command line or in a chat.
 - The older access tokens are deleted (Release Owner, 2026-11-27).
-- Open, for the Release Owner: change the Docker account password (it is the value that leaked); after session f010f26c ends, run `scratchpad/redact_dhi.py --source f010f26c-5c57-4e89-badb-dbd777514459 --apply`.
+- **Decision:** the item about revoking the old credential is ticked on the Release Owner's word (2026-11-27) that the Docker account password, the value that leaked, is changed at the start of that workday. The old access tokens are deleted, and a stale `https://dhi.io` login holding one of them is removed from this workstation's credential store.
+- Open, for the Release Owner: after session f010f26c ends, run `scratchpad/redact_dhi.py --source f010f26c-5c57-4e89-badb-dbd777514459 --apply`.
