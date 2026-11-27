@@ -1,6 +1,6 @@
 ## Checks
 
-`tests/all.sh` runs every check this machine can run and names the seams it skipped; `tests/all.sh --files` is the fast subset CI gates on. Review against `CODING_STANDARDS.md`.
+`tests/all.sh` runs every check this machine can run and names the seams it skipped; `tests/all.sh --files` is the fast subset CI gates on. On GitHub, `.github/workflows/checks.yml` runs the same pipeline jobs on each PR until the repository moves to GitLab. Review against `CODING_STANDARDS.md`.
 
 ## Prior art
 

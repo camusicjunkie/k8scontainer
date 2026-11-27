@@ -1,0 +1,29 @@
+# The file checks and the linters on every GitHub PR, until the repository
+# moves to the Connected Side's GitLab and its pipeline is the one gate.
+# Delete .github/ then (see docs/release-owner-guide.md).
+#
+# Each job runs a GitLab job's script in the image .gitlab-ci.yml names for
+# it, so the images stay pinned in one place and release/update-pins.py keeps
+# moving them. tests/ci.py checks this list covers the checks job and every
+# linter.
+name: checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  gitlab-job:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        job: [checks, shellcheck, hadolint]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: python3 -m pip install --quiet --user --break-system-packages pyyaml==6.0.2
+      - run: python3 .github/run-gitlab-job.py ${{ matrix.job }}

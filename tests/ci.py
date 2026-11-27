@@ -16,6 +16,7 @@ import yaml
 
 CI = Path(__file__).resolve().parent.parent / ".gitlab-ci.yml"
 DOCKERFILE = CI.parent / "image/Dockerfile"
+GITHUB = CI.parent / ".github/workflows/checks.yml"
 # tests/lint.sh's LINTERS line, so a linter added there needs its job here.
 LINTERS = tuple(re.search(r'^LINTERS="([^"]*)"', (CI.parent / "tests/lint.sh").read_text(), re.M).group(1).split())
 TOKEN = re.compile(r'\s*(&&|\|\||==|!=|=~|!~|\$\w+|"[^"]*"|/(?:\\/|[^/])*/|\(|\)|null)')
@@ -204,6 +205,19 @@ else:
     check("every literal image is pinned to a version", all(
         ":" in str(j["image"] if isinstance(j["image"], str) else j["image"]["name"]) and "latest" not in str(j["image"])
         for j in cfg.values() if isinstance(j, dict) and "image" in j and "$" not in str(j["image"])))
+
+# The GitHub holdover gate, while the repository lives on GitHub. It goes when
+# .github/ does.
+if cfg is not None and GITHUB.exists():
+    gh = yaml.safe_load(GITHUB.read_text())
+    steps = [s for j in gh.get("jobs", {}).values() for s in j.get("steps", [])]
+    matrix = [n for j in gh.get("jobs", {}).values() for n in j.get("strategy", {}).get("matrix", {}).get("job", [])]
+    check("the GitHub workflow runs on pull requests", "pull_request" in (gh.get("on") or gh.get(True) or {}))
+    check("the GitHub workflow runs the checks job and every linter's job",
+          {"checks", *LINTERS} <= set(matrix) and any("run-gitlab-job.py ${{ matrix.job }}" in s.get("run", "") for s in steps),
+          f"got {matrix}")
+    check("every GitHub action is pinned by commit",
+          all(re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", s["uses"]) for s in steps if "uses" in s))
 
 if failed:
     print(f"{len(failed)} case(s) failed")

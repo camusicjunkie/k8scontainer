@@ -121,6 +121,17 @@ These live in Harbor and GitLab, not in Git, so no check here can see them. Set 
 
 The Management Cluster's own outside settings (DNS for the Gateway address, snapshots of the admins' volumes) are the Gitops repository's: see its README, "Management Cluster: Devcontainer Pods".
 
+## Moving this repository off GitHub
+
+Until it moves to the Connected Side's GitLab, the repository lives on GitHub, where `.github/workflows/checks.yml` gates pull requests with the pipeline's `checks`, `shellcheck` and `hadolint` jobs. When it moves:
+
+- **Delete `.github/`**, and in `tests/ci.py` the block headed "The GitHub holdover gate". The pipeline's own jobs are then the only gate.
+- **Repoint the prior art.** `AGENTS.md` ("Prior art"), `README.md` and `tests/kind/up.sh` name the old repository and the Gitops repository by their GitHub projects (`camusicjunkie/...`) and workstation checkouts; change them to the GitLab projects.
+- **Remotes.** Push to the new project and make it `origin`; drop the GitHub and lab remotes.
+- **History.** Commits made with Claude Code carry a `Claude-Session:` trailer linking a claude.ai session. Push the history as it is, or start the new project from one squashed commit if those links should not travel. No secret is in the history (checked 2026-11-27).
+- **`.scratch/`** holds the tickets, which cite GitHub PRs (`camusicjunkie/Gitops#3`) as history. Keep it as the record, or leave it behind.
+- **Settings.** The new project needs the one-time setup and the settings outside this repository, both above.
+
 ## Carrying this repository to another network
 
 Each network's GitLab holds its own copy of this repository, which its Management Cluster syncs (the Gitops repository's `DEVCONTAINER_REPO_URL`). Keep the copies identical apart from the Roster, so carrying a change across is a plain merge:
